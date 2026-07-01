@@ -1,0 +1,29 @@
+SOUND_VOLUME = 0.1
+TIME_BETWEEN_DRONS = 2
+NEW_DRON_SPEED_0 = 400
+NEW_DRON_SPEED_MULT = 1.00004
+MAX_DRONS = 2
+MAX_ROCKETS = 2
+# Урон для каждого типа зданий
+
+# НПЗ
+REFINERY_DRON_DAMAGE = 10
+REFINERY_OBLOMOK_DAMAGE = 5
+REFINERY_ROCKET_DAMAGE = 20
+
+# Резервуар
+TANK_DRON_DAMAGE = 25
+TANK_OBLOMOK_DAMAGE = 10
+# Урон от ракеты для резервуара всегда 100
+
+# ПВО
+PVO_DRON_DAMAGE = 50
+PVO_OBLOMOK_DAMAGE = 20
+# Ракета не может попасть по ПВО
+
+# Коэффициенты для вычисления счёта
+STRIKE_COEFF          = 10
+LOST_ROCKETS_COEFF    = 1
+INDUSTRY_STRIKE_COEFF = 50
+MISSED_DRONS_COEFF    = 5
+DAMAGE_COEFF          = 0.1
