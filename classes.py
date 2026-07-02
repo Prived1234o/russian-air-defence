@@ -365,7 +365,7 @@ class PvoRocket(Projectile):
     def check_collision(self):
         strike = arcade.check_for_collision_with_lists(self, (self.view.dron_collision_list, self.view.industry_list))
         if strike:
-            if type(strike[0]) == Dron:
+            if type(strike[0]) == Dron and not strike[0].exploding:
                 strike[0].explode()
                 self.view.num_strikes += 1
             self.explode()

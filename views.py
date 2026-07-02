@@ -59,11 +59,13 @@ class Menu(arcade.View):
                                               multiline=True, width=w * 0.28, batch=self.batch)
         self.game_controls_text.text = """
         В этой увлекательной* игре вы сможете попробовать себя в роли российского военного и \
-предстанете перед судом сможете управлять установкой ПВО. Вам нужно будет как можно дольше защищать ПНЗ от \
+предстанете перед судом сможете управлять установкой ПВО. Вам нужно будет как можно дольше защищать НПЗ от \
 украинских беспилотников. А если вы не справитесь...
 
         Чтобы запустить ракету, нажмите <ЛКМ>, и ракета полетит в сторону курсора.
-        Чтобы управлять ракетой, водите курсором по экрану, ракета начнёт поворачивать в его строну.
+        Чтобы управлять ракетой, водите курсором по экрану, ракета начнёт поворачивать в его сторону.
+        Вы можете поставить игру на паузу на <Пробел>.
+        
         В каждый момент времени на поле может быть не более 2 ракет.
         """
         self.note_text = arcade.Text('*при очень растяжимом понятии "увлекательный"', w * 0.005, h * 0.04,
@@ -174,13 +176,17 @@ class Game(arcade.View):
         self.hint_text = arcade.Text("", self.window.width / 2, self.window.height * 0.035 / 2,
                                      color=arcade.color.BLACK,
                                      anchor_x="center", anchor_y="center", align="center", batch=self.text_batch)
+
+        self.pause_text = arcade.Text("Игра на паузе", self.window.width / 2, self.window.height * 0.76,
+                                      color=arcade.color.BLACK, font_size=40,
+                                      anchor_x='center', anchor_y='center', align='center', batch=self.text_batch)
         self.end_text = arcade.Text("Атака окончена", self.window.width / 2, self.window.height * 0.8,
                                     color=arcade.color.BLACK, font_size=40,
                                     anchor_x='center', align='center', batch=self.text_batch)
         self.end_text_hint = arcade.Text("Для выхода в меню нажмите E", self.window.width / 2, self.window.height * 0.7,
                                     color=arcade.color.BLACK, font_size=20,
                                     anchor_x='center', align='center', batch=self.text_batch)
-        self.end_text_rect = arcade.XYWH(self.window.width / 2, self.window.height * 0.76,
+        self.text_hint_rect = arcade.XYWH(self.window.width / 2, self.window.height * 0.76,
                                          self.window.width * 0.4, self.window.height * 0.3)
 
         self.health_texture = arcade.load_texture('textures/empty health.png')
@@ -233,10 +239,12 @@ class Game(arcade.View):
         self.tank2_health_rect = arcade.XYWH(self.industry_list[2].center_x, self.window.height * 0.19,
                                              self.window.width * 0.12, self.window.height * 0.015)
 
+        self.pause = False
         self.end = False
+        self.pause_text.visible = False
         self.end_text.visible = False
         self.end_text_hint.visible = False
-        self.hint_text.text = "ESC — выход    F — завершить игру    R — перезапуск"
+        self.hint_text.text = "ESC — выход    Space — пауза    F — завершить игру    R — перезапуск"
 
         self.score = 0
 
@@ -269,8 +277,8 @@ class Game(arcade.View):
         self.draw_health(self.tank2_health, self.tank2_health_rect)
         self.draw_health(self.pvo_health, self.pvo_health_rect)
 
-        if self.end:
-            arcade.draw_rect_filled(self.end_text_rect, (255, 255, 255, 127))
+        if self.end or self.pause:
+            arcade.draw_rect_filled(self.text_hint_rect, (255, 255, 255, 127))
         self.text_batch.draw()
 
     def draw_health(self, health: float, health_rect: arcade.Rect):
@@ -291,6 +299,8 @@ class Game(arcade.View):
         arcade.draw_texture_rect(self.health_texture, health_rect)
 
     def on_update(self, delta_time: float):
+        self.fps_text.text = f"{1 / delta_time: 0.2f} FPS"
+
         if self.pause:
             return
 
@@ -334,7 +344,6 @@ class Game(arcade.View):
             seconds = int(self.time % 60)
             self.time_text.text = f"{'0' if minutes < 10 else ''}{minutes}:{'0' if seconds < 10 else ''}{seconds}"
             self.score_text.text = f"Счёт: {' ' * (4 - len(str(self.score)))}{self.score}"
-            self.fps_text.text = f"{1 / delta_time: 0.2f} FPS"
             self.rockets_text.text = (f"Запущено ракет: {self.num_launched_rockets}\n"
                                       f"Попадания в дроны: {self.num_strikes}")
 
@@ -351,34 +360,9 @@ class Game(arcade.View):
         elif symbol == arcade.key.F:
             self.end_game()
 
-        elif symbol == arcade.key.SPACE:
+        elif symbol == arcade.key.SPACE and not self.end:
             self.pause = not self.pause
-
-        # if self.role == 'pvo':
-        #     if symbol == arcade.key.N and self.num_rockets <= 1:
-        #         try:
-        #             self.rocket_list[-1].turning_left = False
-        #             self.rocket_list[-1].turning_right = False
-        #         except IndexError:
-        #             pass
-        #         self.rocket_list.append(PvoRocket(150, 350, rot=45))
-        #         arcade.play_sound(launch_sound, SOUND_VOLUME)
-        #     elif symbol == arcade.key.A:
-        #         self.rocket_list[-1].turning_left = True
-        #     elif symbol == arcade.key.D:
-        #         self.rocket_list[-1].turning_right = True
-        # elif self.role == 'dron':
-        #     if symbol == arcade.key.A:
-        #         self.dron_list[-1].turning_left = True
-        #     elif symbol == arcade.key.D:
-        #         self.dron_list[-1].turning_right = True
-        #     elif symbol == arcade.key.N and self.num_drons <= 1:
-        #         self.dron_list.append(Dron(1700, 700))
-    # def on_key_release(self, symbol: int, modifiers: int):
-    #     if symbol == arcade.key.A:
-    #         self.rocket_list[-1].turning_left = False
-    #     elif symbol == arcade.key.D:
-    #         self.rocket_list[-1].turning_right = False
+            self.pause_text.visible = self.pause
 
     def on_mouse_motion(self, x: int, y: int, dx: int, dy: int) -> bool | None:
         if self.num_rockets != 0 and not self.end:
@@ -402,7 +386,7 @@ class Game(arcade.View):
     def on_mouse_press(self, x: int, y: int, button: int, modifiers: int) -> bool | None:
         if not self.pvo_list:
             return
-        if self.num_rockets <= MAX_ROCKETS - 1 and not self.pvo_list[0].exploding and not self.end:
+        if self.num_rockets <= MAX_ROCKETS - 1 and not self.pvo_list[0].exploding and not self.end and not self.pause:
             pvo_x = self.pvo_list[0].center_x
             pvo_y = self.pvo_list[0].center_y
             new_rot = degrees(atan2(x - pvo_x, y - pvo_y))
@@ -646,6 +630,9 @@ class End(arcade.View):
             rating_rate -= 0.5
             fuel_rate += 1.25
 
+        percent_strikes = float(percentage_text[:-1:])
+        rating_rate *= 1.1 - percent_strikes / 100 * 0.15
+        rating_rate *= 1.1 ** num_industry_strikes
         rating_rate *= (100 - refinery_health) / 100 * 7 + 1
         if refinery_health == 0:
             rating_rate *= 1.8
@@ -654,20 +641,23 @@ class End(arcade.View):
         rating_rate *= uniform(0.9, 1.1)
         fuel_rate *= uniform(0.9, 1.1)
 
+        # Рейтинг не может упасть на ниже чем 100%, но чтобы было красивше, то 99.99%
+        rating_rate = max(-99.99, rating_rate)
+
         self.rating_text = arcade.Text('Рейтинг «единой россии»:                   за эту неделю',
                                        w * 0.55, h * 0.3,
                                        color=arcade.color.BLACK, font_size=20,
                                        anchor_y='center', anchor_x='left', batch=self.statistics_batch)
-        self.rating_rate_text = arcade.Text(f'{rating_rate: 0.2f}%', w * 0.75, h * 0.3,
+        self.rating_rate_text = arcade.Text(f'{rating_rate: 0.2f}%', w * 0.807, h * 0.3,
                                             color=(127, 0, 0), font_size=20,
-                                            anchor_y='center', anchor_x='left', batch=self.statistics_batch)
+                                            anchor_y='center', anchor_x='right', batch=self.statistics_batch)
         self.fuel_text = arcade.Text('Цены на бензин:                      за эту неделю',
                                      w * 0.55, h * 0.26,
                                      color=arcade.color.BLACK, font_size=20,
                                      anchor_y='center', anchor_x='left', batch=self.statistics_batch)
-        self.fuel_rate_text = arcade.Text(f'+{fuel_rate: 0.2f}%', w * 0.68, h * 0.26,
+        self.fuel_rate_text = arcade.Text(f'+{fuel_rate: 0.2f}%', w * 0.747, h * 0.26,
                                           color=(127, 0, 0), font_size=20,
-                                          anchor_y='center', anchor_x='left', batch=self.statistics_batch)
+                                          anchor_y='center', anchor_x='right', batch=self.statistics_batch)
 
         # Кнопки
         self.ui_manager = UIManager()
