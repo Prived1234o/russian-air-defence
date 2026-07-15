@@ -1,17 +1,25 @@
 import arcade
 from arcade.gui import UIManager, UITextureButton, UIAnchorLayout, UITextureButtonStyle
 from pyglet.graphics import Batch
-from classes import Pvo, PvoRocket, Dron, Refinery, Tank
+from classes import Pvo, PvoTower, PvoRocket, Dron, Refinery, Tank
 from math import degrees, atan2, sin, radians
 from random import randint, triangular, shuffle, uniform
-from constants import TIME_BETWEEN_DRONS, NEW_DRON_SPEED_MULT, MAX_DRONS, MAX_ROCKETS, NEW_DRON_SPEED_0, STRIKE_COEFF, \
-    LOST_ROCKETS_COEFF, MISSED_DRONS_COEFF, DAMAGE_COEFF, INDUSTRY_STRIKE_COEFF
+from constants import (TIME_BETWEEN_DRONS, NEW_DRON_SPEED_MULT, MAX_DRONS, MAX_ROCKETS, NEW_DRON_SPEED_0, STRIKE_COEFF,
+    LOST_ROCKETS_COEFF, MISSED_DRONS_COEFF, DAMAGE_COEFF, INDUSTRY_STRIKE_COEFF, VERSION, TIME_BETWEEN_TEXT,
+    TIME_TO_LAST_STAGE)
+import json
+from os.path import exists
 
-ROLE_DEBUG = 'pvo'
+style_regular_button: dict[str, UITextureButtonStyle] = {}
+style_keybind_button: dict[str, UITextureButtonStyle] = {}
 
 print("Загрузка текстур (2/2).")
 button_texture_regular = arcade.load_texture('textures/gui/button regular.png')
 button_texture_interact = arcade.load_texture('textures/gui/button interact.png')
+button_texture_disabled = arcade.load_texture('textures/gui/button disabled.png')
+# checkbox_texture_on = arcade.load_texture('textures/gui/checkbox on.png')
+# checkbox_texture_off = arcade.load_texture('textures/gui/checkbox off.png')
+
 # Сообщения для конечного экрана
 # {название: (текстура, отн. ширина (1 = 544p), отн. высота (1 = 360p)}, кол-во позиций для текста,
 #                                                                       (только у moskva 24 и tass)
@@ -31,6 +39,7 @@ messages = \
      'sobyanin template': (arcade.load_texture('textures/messages/sobyanin template.jpg'), 0.96, 0.422)
      }
 arcade.load_font('fonts/OpenSans-Regular.ttf')
+health_texture = arcade.load_texture('textures/empty health.png')
 print("Готово!")
 
 prices: dict[str, int] = {'pvo': 1_200_435_200, 'rocket': 9_514_610, 'dron': 18_012_700, 'tank': 730_656_507, 'refinery': 893_980_440_000}
@@ -45,17 +54,35 @@ prices: dict[str, int] = {'pvo': 1_200_435_200, 'rocket': 9_514_610, 'dron': 18_
 class Menu(arcade.View):
     def __init__(self):
         super().__init__()
-
         w = self.window.width
         h = self.window.height
 
+        # Сокращение от relative
+        self.r = w / 1536
+        # 1536 пикселей -- это ширина окна, с которым я тестировал игру у себя
+        # Возможно, это из-за fullscreen=True
+        global style_regular_button
+        global style_keybind_button
+        style_regular_button = {
+            "normal": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15*self.r),
+            "hover": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15*self.r),
+            "press": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15*self.r),
+            "disabled": UITextureButtonStyle(font_color=arcade.color.TRANSPARENT_BLACK, font_size=15*self.r)}
+        style_keybind_button = {
+            "normal": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r),
+            "hover": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r),
+            "press": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r),
+            "disabled": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r)}
+
+        self.keybind_button: None | UITextureButton = None
+
         self.batch = Batch()
 
-        self.title = arcade.Text('российское ПВО', w * 0.5, h * 0.8, color=arcade.color.BLACK, font_size=60,
+        self.title = arcade.Text('российское ПВО', w * 0.5, h * 0.8, color=arcade.color.BLACK, font_size=60*self.r,
                                  align='center', bold=True, anchor_x='center', anchor_y='center', batch=self.batch)
-        self.version_text = arcade.Text('v1.0.0', w * 0.5, h * 0.725, color=arcade.color.BLACK, font_size=20,
+        self.version_text = arcade.Text(VERSION, w * 0.5, h * 0.725, color=arcade.color.BLACK, font_size=20*self.r,
                                         align='center', anchor_x='center', anchor_y='center', batch=self.batch)
-        self.game_controls_text = arcade.Text('', w * 0.02, h * 0.7, color=arcade.color.BLACK, font_size=15,
+        self.game_controls_text = arcade.Text('', w * 0.02, h * 0.7, color=arcade.color.BLACK, font_size=15*self.r,
                                               multiline=True, width=w * 0.28, batch=self.batch)
         self.game_controls_text.text = """
         В этой увлекательной* игре вы сможете попробовать себя в роли российского военного и \
@@ -63,34 +90,32 @@ class Menu(arcade.View):
 украинских беспилотников. А если вы не справитесь...
 
         Чтобы запустить ракету, нажмите <ЛКМ>, и ракета полетит в сторону курсора.
-        Чтобы управлять ракетой, водите курсором по экрану, ракета начнёт поворачивать в его сторону.
+        Чтобы управлять ракетой, водите курсором по экрану, ракета начнёт поворачивать в его сторону. \
+(Держите курсор подальше от ракеты, иначе она может начать петлять).
         Вы можете поставить игру на паузу на <Пробел>.
         
         В каждый момент времени на поле может быть не более 2 ракет.
         """
         self.note_text = arcade.Text('*при очень растяжимом понятии "увлекательный"', w * 0.005, h * 0.04,
-                                        color=arcade.color.BLACK, anchor_y='bottom',
+                                        color=arcade.color.BLACK, anchor_y='bottom', font_size=12*self.r,
                                         batch=self.batch)
         self.hint_text = arcade.Text("ESC — выход", self.window.width / 2,
                                      self.window.height * 0.035 / 2,
-                                     color=arcade.color.BLACK,
+                                     color=arcade.color.BLACK, font_size=12*self.r,
                                      anchor_x="center", anchor_y="center", align="center", batch=self.batch)
-        self.future_text = arcade.Text("Скоро здесь что-то будет", w * 0.75, h * 0.7, rotation=60, font_size=30,
+        self.future_text = arcade.Text("Скоро здесь что-то будет", w * 0.75, h * 0.7, rotation=60, font_size=30*self.r,
                                        color=arcade.color.DARK_GRAY, batch=self.batch)
         self.creator_text = arcade.Text("от рандомного (недо)оппозиционера", w * 0.995, h * 0.04,
-                                        color=arcade.color.BLACK, anchor_x='right', anchor_y='bottom',
-                                        batch=self.batch)
+                                        color=arcade.color.BLACK, font_size=12*self.r,
+                                        anchor_x='right', anchor_y='bottom', batch=self.batch)
         # Кнопка
         self.ui_manager = UIManager()
         anchor = self.ui_manager.add(UIAnchorLayout())
-        style = {"normal": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15),
-                 "hover": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15),
-                 "press": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15)}
-        button_play = anchor.add(UITextureButton(text="Играть", width=w * 0.12, height=w * 0.04,
-                                             texture=button_texture_regular, texture_hovered=button_texture_interact,
-                                             texture_pressed=button_texture_interact, style=style),
-                             anchor_x='left', anchor_y='bottom', align_x=w * 0.44, align_y=h * 0.1)
 
+        button_play = anchor.add(UITextureButton(text="Играть", width=w * 0.09, height=w * 0.04,
+                                                 texture=button_texture_regular, texture_hovered=button_texture_interact,
+                                                 texture_pressed=button_texture_interact, style=style_regular_button),
+                                 anchor_x='left', anchor_y='bottom', align_x=w * 0.455, align_y=h * 0.1)
         @button_play.event("on_click")
         def on_click(event):
             game_view = Game()
@@ -105,13 +130,14 @@ class Menu(arcade.View):
         self.clear()
         arcade.draw_rect_filled(arcade.LRBT(0, self.window.width, 0, self.window.height * 0.035), arcade.color.WHITE)
         arcade.draw_line(self.window.width * 0.02, self.window.height * 0.62,
-                         self.window.width * 0.16, self.window.height * 0.62, arcade.color.BLACK, line_width=2)
+                         self.window.width * 0.16, self.window.height * 0.62, arcade.color.BLACK, line_width=2*self.r)
         self.batch.draw()
         self.ui_manager.draw()
 
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         if symbol == arcade.key.ESCAPE:
             self.window.close()
+        print(symbol)
 
 class Game(arcade.View):
     num_rockets = 0
@@ -128,8 +154,6 @@ class Game(arcade.View):
     new_drone_speed = NEW_DRON_SPEED_0
 
     pvo_list = None
-    pvo_tower_rect = None
-    pvo_tower_texture = arcade.load_texture('textures/pvo/tower.png')
     explosions_list = None
     smoke_list = None
     rocket_list = None
@@ -159,37 +183,37 @@ class Game(arcade.View):
     background_image = None
 
     def __init__(self):
-        super().__init__()
         print("Инициализация игры.")
+        super().__init__()
+        self.r = self.window.width / 1536
+
         self.text_batch = Batch()
 
-        self.fps_text = arcade.Text("", 10, self.window.height * 0.97, color=arcade.color.BLACK, batch=self.text_batch)
+        # self.fps_text = arcade.Text("", 10, self.window.height * 0.97, color=arcade.color.BLACK, batch=self.text_batch)
         self.rockets_text = arcade.Text("", self.window.width * 0.01, self.window.height * 0.105,
-                                        color=arcade.color.BLACK, width=200,
+                                        color=arcade.color.BLACK, width=200, font_size=12*self.r,
                                         anchor_y='center', multiline=True, batch=self.text_batch)
         self.time_text = arcade.Text("", self.window.width * 0.5, self.window.height * 0.105,
-                                      color=arcade.color.BLACK, font_size=40,
+                                      color=arcade.color.BLACK, font_size=40*self.r,
                                       anchor_x='center', anchor_y='center', batch=self.text_batch)
         self.score_text = arcade.Text("", self.window.width * 0.98, self.window.height * 0.105,
-                                      color=arcade.color.BLACK, font_size=25,
+                                      color=arcade.color.BLACK, font_size=25*self.r,
                                       anchor_x='right', anchor_y='center', batch=self.text_batch)
         self.hint_text = arcade.Text("", self.window.width / 2, self.window.height * 0.035 / 2,
-                                     color=arcade.color.BLACK,
+                                     color=arcade.color.BLACK, font_size=12*self.r,
                                      anchor_x="center", anchor_y="center", align="center", batch=self.text_batch)
 
         self.pause_text = arcade.Text("Игра на паузе", self.window.width / 2, self.window.height * 0.76,
-                                      color=arcade.color.BLACK, font_size=40,
+                                      color=arcade.color.BLACK, font_size=40*self.r,
                                       anchor_x='center', anchor_y='center', align='center', batch=self.text_batch)
         self.end_text = arcade.Text("Атака окончена", self.window.width / 2, self.window.height * 0.8,
-                                    color=arcade.color.BLACK, font_size=40,
+                                    color=arcade.color.BLACK, font_size=40*self.r,
                                     anchor_x='center', align='center', batch=self.text_batch)
         self.end_text_hint = arcade.Text("Для выхода в меню нажмите E", self.window.width / 2, self.window.height * 0.7,
-                                    color=arcade.color.BLACK, font_size=20,
+                                    color=arcade.color.BLACK, font_size=20*self.r,
                                     anchor_x='center', align='center', batch=self.text_batch)
         self.text_hint_rect = arcade.XYWH(self.window.width / 2, self.window.height * 0.76,
-                                         self.window.width * 0.4, self.window.height * 0.3)
-
-        self.health_texture = arcade.load_texture('textures/empty health.png')
+                                          self.window.width * 0.4, self.window.height * 0.3)
 
         self.background_rect = arcade.XYWH(self.window.width * 0.5, self.window.height * 0.55,
                                            self.window.width, self.window.height)
@@ -207,15 +231,15 @@ class Game(arcade.View):
         self.time_since_last_dron = 0
         self.new_drone_speed = Dron.speed
 
+        self.misc_list = arcade.SpriteList()
         self.explosions_list = arcade.SpriteList()
         self.smoke_list = arcade.SpriteList()
 
         self.pvo_list = arcade.SpriteList()
         self.pvo_list.append(Pvo(self, self.window.width * 0.37, self.window.height * 0.5))
-        self.pvo_tower_rect = arcade.LRBT(self.pvo_list[0].left - 30, self.pvo_list[0].right + 30,
-                                          self.window.height * 0.21, self.pvo_list[0].center_y - 40)
+        self.misc_list.append(PvoTower(self, self.window.width * 0.37, self.window.height * 0.335))
         self.pvo_health_rect = arcade.XYWH(self.pvo_list[0].center_x, self.window.height * 0.19,
-                                                self.window.width * 0.12, self.window.height * 0.015)
+                                           self.window.width * 0.12, self.window.height * 0.015)
         self.pvo_health = 100
 
         self.rocket_list = arcade.SpriteList()
@@ -248,17 +272,14 @@ class Game(arcade.View):
 
         self.score = 0
 
-        self.misc_list = arcade.SpriteList()
         self.background_image = arcade.load_texture(f'textures/background/{randint(1, 4)}.jpg')
 
     def on_draw(self):
         self.clear()
         arcade.draw_texture_rect(self.background_image, self.background_rect)
 
-        self.misc_list.draw()
         self.dron_list.draw()
         self.pvo_list.draw()
-        arcade.draw_texture_rect(self.pvo_tower_texture, self.pvo_tower_rect)
         self.rocket_list.draw()
 
         arcade.draw_rect_filled(arcade.LRBT(0, self.window.width, 0, self.window.height * 0.22), (232, 232, 232))
@@ -266,6 +287,7 @@ class Game(arcade.View):
         arcade.draw_rect_filled(arcade.LRBT(0, self.window.width, self.window.height * 0.205, self.window.height * 0.22),
                                 (64, 64, 64))
 
+        self.misc_list.draw()
         self.industry_list.draw()
         self.smoke_list.draw()
         self.explosions_list.draw()
@@ -296,10 +318,10 @@ class Game(arcade.View):
                                                 health_rect.bottom * 1.01,
                                                 health_rect.top * 0.99),
                                     filled_health_color)
-        arcade.draw_texture_rect(self.health_texture, health_rect)
+        arcade.draw_texture_rect(health_texture, health_rect)
 
     def on_update(self, delta_time: float):
-        self.fps_text.text = f"{1 / delta_time: 0.2f} FPS"
+        # self.fps_text.text = f"{1 / delta_time: 0.2f} FPS"
 
         if self.pause:
             return
@@ -410,6 +432,7 @@ class Game(arcade.View):
         self.end_text.visible = True
         self.end_text_hint.visible = True
         self.hint_text.text = "ESC — выход    E — меню    R — перезапуск"
+        self.pause_text.visible = False
 
 class End(arcade.View):
     time = 0
@@ -424,38 +447,40 @@ class End(arcade.View):
         w = self.window.width
         h = self.window.height
 
-        with open('player stats.txt') as player_stats_file:
-            best_score_line, best_time_line, *s = player_stats_file.readlines()
-            best_score = int(best_score_line.split('=')[1])
-            best_time  = best_time_line.split('=')[1]
-            to_write = ''
+        self.time = -0.5
+        self.stage = 0
 
-            self.score = score
-            if score > best_score:
-                self.new_best_score = True
-                best_score = score
-                to_write += f'best_score={score}\n'
-            else:
-                to_write += best_score_line
+        player_stats: dict[str, int | str]
+        if exists("player stats.json"):
+            with open('player stats.json') as player_stats_file:
+                player_stats = json.load(player_stats_file)
 
-            self.time_str = time_str
-            mins_old, secs_old = map(int, time_str.split(':'))
-            mins_new, secs_new = map(int, best_time.split(':'))
-            if mins_old > mins_new or mins_old == mins_new and secs_old > secs_new:
-                self.new_best_time = True
-                best_time = time_str
-                to_write += f'best_time={time_str}\n'
-            else:
-                to_write += best_time_line
-        with open('player stats.txt', 'w+', encoding='utf-8') as player_stats_file:
-            player_stats_file.write(to_write + 'Пожалуйста, не изменяйте этот файл, иначе игра не будет работать!')
+                self.score = score
+                if score > player_stats['best score']:
+                    self.new_best_score = True
+                    player_stats['best score'] = score
+
+                self.time_str = time_str
+                mins_old, secs_old = map(int, time_str.split(':'))
+                mins_new, secs_new = map(int, player_stats['best time'].split(':'))
+                if mins_old > mins_new or mins_old == mins_new and secs_old > secs_new:
+                    self.new_best_time = True
+                    player_stats['best time'] = time_str
+        else:
+            player_stats = {"best score": score, "best time": time_str}
+            self.new_best_time = True
+            self.new_best_score = True
+        best_score = player_stats['best score']
+        best_time = player_stats['best time']
+        with open('player stats.json', 'w+', encoding='utf-8') as player_stats_file:
+            json.dump(player_stats, player_stats_file, indent=4)
 
         self.price_rockets = num_launched_rockets * prices['rocket']
         self.price_pvo = int((100 - pvo_health) / 100 * prices['pvo'])
         self.price_refinery = int((100 - refinery_health) / 100 * prices['refinery'])
         self.price_tanks = int((200 - (tank1_health + tank2_health)) / 200 * prices['tank'])
 
-        self.total_price = self.price_rockets + self.price_pvo + self.price_refinery + self.price_tanks
+        self.total_price = 0
 
         ################## Официальные сообщения ##########################
         self.messages_batch = Batch()
@@ -467,6 +492,7 @@ class End(arcade.View):
         self.messages_data_list: list[arcade.Text] = []
         self.messages_texts: list[arcade.Text] = []
         self.append_messages_list(num_strikes, num_missed_drons)
+        self.messages_visible = False
 
         ################# ОТЧЁТ ########################
         self.tables_batch = Batch()
@@ -518,10 +544,12 @@ class End(arcade.View):
                                             color=arcade.color.BLACK, font_size=16,
                                             font_name=("Times New Roman", "Times", "Liberation Serif"),
                                             anchor_x='center', align='center', batch=self.tables_batch)
+            new_position_text.visible = False
             new_value_text = arcade.Text(line[1], w * 0.592, h * (0.735 - line_num * 0.055),
                                          color=arcade.color.BLACK, font_size=16,
                                          font_name=("Times New Roman", "Times", "Liberation Serif"),
                                          anchor_x='center', align='center', batch=self.tables_batch)
+            new_value_text.visible = False
             self.table_drons_contents.append(new_position_text)
             self.table_drons_contents.append(new_value_text)
             line_num += 1
@@ -574,14 +602,17 @@ class End(arcade.View):
                                             color=arcade.color.BLACK, font_size=16,
                                             font_name=("Times New Roman", "Times", "Liberation Serif"),
                                             anchor_x='center', align='center', batch=self.tables_batch)
+            new_position_text.visible = False
             new_value1_text = arcade.Text(line[2], w * 0.859, h * (0.735 - line_num * 0.055),
                                           color=arcade.color.BLACK, font_size=16,
                                           font_name=("Times New Roman", "Times", "Liberation Serif"),
                                           anchor_x='center', align='center', batch=self.tables_batch)
+            new_value1_text.visible = False
             new_value2_text = arcade.Text(line[3], w * 0.929, h * (0.735 - line_num * 0.055),
                                           color=arcade.color.BLACK, font_size=16,
                                           font_name=("Times New Roman", "Times", "Liberation Serif"),
                                           anchor_x='center', align='center', batch=self.tables_batch)
+            new_value2_text.visible = False
             self.table_destruction_contents.append([new_position_text, new_value1_text, new_value2_text])
             line_num += 1
 
@@ -589,28 +620,31 @@ class End(arcade.View):
                                                              color=arcade.color.BLACK, font_size=16,
                                                              font_name=("Times New Roman", "Times", "Liberation Serif"),
                                                              anchor_x='center', align='center', batch=self.tables_batch),
-                                                arcade.Text(f'{self.total_price:_}'.replace("_", " "), w * 0.929, h * 0.515,
+                                                arcade.Text(f'{self.total_price:_}'.replace('_', ' '), w * 0.929, h * 0.515,
                                                             color=arcade.color.BLACK, font_size=16,
                                                             font_name=("Times New Roman", "Times", "Liberation Serif"),
                                                             anchor_x='center', align='center', batch=self.tables_batch)])
 
-        self.statistics_batch = Batch()
-
+        self.player_stats_batch = Batch()
         # Счёт, Лучший     Время, Лучшее
         self.score_text = arcade.Text(f'Счёт: {score}', w * 0.3, h * 0.34,
                                       color=arcade.color.BLACK, font_size=40,
-                                      anchor_x='left', batch=self.statistics_batch)
+                                      anchor_x='left', batch=self.player_stats_batch)
+        self.score_text.visible = False
         self.best_score_text = arcade.Text(f'Лучший: {best_score}', w * 0.3, h * 0.30,
                                             color=arcade.color.BLACK, font_size=20,
-                                            anchor_x='left', batch=self.statistics_batch)
+                                            anchor_x='left', batch=self.player_stats_batch)
+        self.best_score_text.visible = False
         if self.new_best_score:
             self.best_score_text.text += '  Новый рекорд!'
         self.time_text = arcade.Text(f'Время: {time_str}', w * 0.3, h * 0.24,
                                      color=arcade.color.BLACK, font_size=40,
-                                     anchor_x='left', batch=self.statistics_batch)
+                                     anchor_x='left', batch=self.player_stats_batch)
+        self.time_text.visible = False
         self.best_time_text = arcade.Text(f'Лучшее: {best_time}', w * 0.3, h * 0.20,
                                           color=arcade.color.BLACK, font_size=20,
-                                          anchor_x='left', batch=self.statistics_batch)
+                                          anchor_x='left', batch=self.player_stats_batch)
+        self.best_time_text.visible = False
         if self.new_best_time:
             self.best_time_text.text += '  Новый рекорд!'
 
@@ -644,54 +678,64 @@ class End(arcade.View):
         # Рейтинг не может упасть на ниже чем 100%, но чтобы было красивше, то 99.99%
         rating_rate = max(-99.99, rating_rate)
 
+        self.rates_batch = Batch()
+        self.rates_visible = False
         self.rating_text = arcade.Text('Рейтинг «единой россии»:                   за эту неделю',
                                        w * 0.55, h * 0.3,
                                        color=arcade.color.BLACK, font_size=20,
-                                       anchor_y='center', anchor_x='left', batch=self.statistics_batch)
+                                       anchor_y='center', anchor_x='left', batch=self.rates_batch)
         self.rating_rate_text = arcade.Text(f'{rating_rate: 0.2f}%', w * 0.807, h * 0.3,
                                             color=(127, 0, 0), font_size=20,
-                                            anchor_y='center', anchor_x='right', batch=self.statistics_batch)
+                                            anchor_y='center', anchor_x='right', batch=self.rates_batch)
         self.fuel_text = arcade.Text('Цены на бензин:                      за эту неделю',
                                      w * 0.55, h * 0.26,
                                      color=arcade.color.BLACK, font_size=20,
-                                     anchor_y='center', anchor_x='left', batch=self.statistics_batch)
+                                     anchor_y='center', anchor_x='left', batch=self.rates_batch)
         self.fuel_rate_text = arcade.Text(f'+{fuel_rate: 0.2f}%', w * 0.747, h * 0.26,
                                           color=(127, 0, 0), font_size=20,
-                                          anchor_y='center', anchor_x='right', batch=self.statistics_batch)
+                                          anchor_y='center', anchor_x='right', batch=self.rates_batch)
 
         # Кнопки
         self.ui_manager = UIManager()
         anchor = self.ui_manager.add(UIAnchorLayout())
-        style = {"normal": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15),
-                 "hover" : UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15),
-                 "press" : UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15)}
-        button1 = anchor.add(UITextureButton(text="Заново", width=w * 0.12 , height=w * 0.04,
-                                             texture=button_texture_regular, texture_hovered=button_texture_interact,
-                                             texture_pressed=button_texture_interact, style=style),
-                             anchor_x='left', anchor_y='bottom', align_x=w * 0.3, align_y=h * 0.1)
-        @button1.event("on_click")
+        empty_texture = arcade.Texture.create_empty(name="empty", size=(1, 1))
+        button_play = anchor.add(
+            UITextureButton(text="Заново", width=w * 0.12 , height=w * 0.04,
+                            texture=button_texture_regular, texture_hovered=button_texture_interact,
+                            texture_pressed=button_texture_interact, texture_disabled=empty_texture,
+                            style=style_regular_button),
+            anchor_x='left', anchor_y='bottom', align_x=w * 0.3, align_y=h * 0.1
+        )
+        @button_play.event("on_click")
         def on_click(event):
             new_game = Game()
             new_game.setup()
             self.window.show_view(new_game)
+        button_play.disabled = True
 
-        button2 = anchor.add(UITextureButton(text="Меню", width=w * 0.12, height=w * 0.04,
-                                             texture=button_texture_regular, texture_hovered=button_texture_interact,
-                                             texture_pressed=button_texture_interact, style=style),
-                             anchor_x='left', anchor_y='bottom', align_x=w * 0.44, align_y=h * 0.1)
-        @button2.event("on_click")
+        button_menu = anchor.add(
+            UITextureButton(text="Меню", width=w * 0.12, height=w * 0.04,
+                            texture=button_texture_regular, texture_hovered=button_texture_interact,
+                            texture_pressed=button_texture_interact, texture_disabled=empty_texture,
+                            style=style_regular_button),
+            anchor_x='left', anchor_y='bottom', align_x=w * 0.44, align_y=h * 0.1)
+        @button_menu.event("on_click")
         def on_click(event):
             self.window.show_view(Menu())
+        button_menu.disabled = True
 
-        button3 = anchor.add(UITextureButton(text="Выход", width=w * 0.12, height=w * 0.04,
-                                             texture=button_texture_regular, texture_hovered=button_texture_interact,
-                                             texture_pressed=button_texture_interact, style=style),
-                             anchor_x='left', anchor_y='bottom', align_x=w * 0.58, align_y=h * 0.1)
-        @button3.event("on_click")
+        button_quit = anchor.add(
+            UITextureButton(text="Выход", width=w * 0.12, height=w * 0.04,
+                            texture=button_texture_regular, texture_hovered=button_texture_interact,
+                            texture_pressed=button_texture_interact, texture_disabled=empty_texture,
+                            style=style_regular_button),
+            anchor_x='left', anchor_y='bottom', align_x=w * 0.58, align_y=h * 0.1)
+        @button_quit.event("on_click")
         def on_click(event):
             self.window.close()
+        button_quit.disabled = True
 
-        self.hint_text = arcade.Text("ESC — выйти", w / 2, 10, arcade.color.BLACK,
+        self.hint_text = arcade.Text("ESC — выйти    Пробел — пропустить", w / 2, 10, arcade.color.BLACK,
                                      width=100, anchor_x="center", align="center")
 
         self.ui_manager.enable()
@@ -707,20 +751,99 @@ class End(arcade.View):
         self.report_text.draw()
         self.messages_text.draw()
         self.tables_batch.draw()
-        self.statistics_batch.draw()
+        self.player_stats_batch.draw()
 
-        for message in self.messages_list:
-            arcade.draw_texture_rect(message[0], message[1])
-        self.messages_batch.draw()
+        if self.messages_visible:
+            for message in self.messages_list:
+                arcade.draw_texture_rect(message[0], message[1])
+            self.messages_batch.draw()
+
+        if self.rates_visible:
+            self.rates_batch.draw()
 
         arcade.draw_rect_filled(arcade.XYWH(self.window.width / 2, 15, self.window.width, 30), arcade.color.WHITE)
         self.hint_text.draw()
 
         self.ui_manager.draw()
 
+    def on_update(self, delta_time: float) -> bool | None:
+        # Анимация постепенного появления текста и всякого такого
+        # (не очень эффективно, наверное)
+        self.time += delta_time
+
+        table_destruction_lines = len(self.table_destruction_contents) - 1
+        if 0 <= self.stage < 4 and self.time >= TIME_BETWEEN_TEXT:
+            self.table_drons_contents[self.stage * 2].visible = True
+            self.table_drons_contents[self.stage * 2 + 1].visible = True
+            self.stage += 1
+            self.time = 0
+        if 4 <= self.stage < 4 + table_destruction_lines and self.time >= TIME_BETWEEN_TEXT:
+            self.table_destruction_contents[self.stage - 4][0].visible = True
+            self.table_destruction_contents[self.stage - 4][1].visible = True
+            self.table_destruction_contents[self.stage - 4][2].visible = True
+            self.total_price += int(self.table_destruction_contents[self.stage - 4][2].text.replace(' ', ''))
+            self.table_destruction_contents[-1][1].text = f'{self.total_price:_}'.replace('_', ' ')
+            self.stage += 1
+            self.time = 0
+        if self.stage == 4 + table_destruction_lines and self.time >= TIME_BETWEEN_TEXT:
+            self.score_text.visible = True
+            self.stage += 1
+            self.time = 0
+        if self.stage == 5 + table_destruction_lines and self.time >= TIME_BETWEEN_TEXT:
+            self.best_score_text.visible = True
+            self.stage += 1
+            self.time = 0
+        if self.stage == 6 + table_destruction_lines and self.time >= TIME_BETWEEN_TEXT:
+            self.time_text.visible = True
+            self.stage += 1
+            self.time = 0
+        if self.stage == 7 + table_destruction_lines and self.time >= TIME_BETWEEN_TEXT:
+            self.best_time_text.visible = True
+            self.stage += 1
+            self.time = 0
+        if self.stage == 8 + table_destruction_lines and self.time >= TIME_BETWEEN_TEXT:
+            self.messages_visible = True
+            self.stage += 1
+            self.time = 0
+        if self.stage == 9 + table_destruction_lines and self.time >= TIME_BETWEEN_TEXT:
+            self.rates_visible = True
+            self.stage += 1
+            self.time = 0
+        if self.stage == 10 + table_destruction_lines and self.time >= TIME_TO_LAST_STAGE:
+            self.ui_manager.children[0][0].children[0].disabled = False
+            self.ui_manager.children[0][0].children[1].disabled = False
+            self.ui_manager.children[0][0].children[2].disabled = False
+            self.hint_text.text = "ESC — выйти"
+            self.time = 0
+            self.stage += 1
+
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         if symbol == arcade.key.ESCAPE:
             self.window.close()
+        # Для дебага
+        # elif symbol == arcade.key.R:
+        #     self.window.show_view(End(0, 0, 0, 0, 0, "00:00", 0, 0, 0, 0))
+        elif symbol == arcade.key.SPACE:
+            for i in range(4):
+                self.table_drons_contents[i * 2].visible = True
+                self.table_drons_contents[i * 2 + 1].visible = True
+            for i in range(len(self.table_destruction_contents) - 1):
+                self.table_destruction_contents[i - 4][0].visible = True
+                self.table_destruction_contents[i - 4][1].visible = True
+                self.table_destruction_contents[i - 4][2].visible = True
+            self.total_price = self.price_rockets + self.price_pvo + self.price_refinery + self.price_tanks
+            self.table_destruction_contents[-1][1].text = f'{self.total_price:_}'.replace('_', ' ')
+            self.score_text.visible = True
+            self.best_score_text.visible = True
+            self.time_text.visible = True
+            self.best_time_text.visible = True
+            self.messages_visible = True
+            self.rates_visible = True
+            self.ui_manager.children[0][0].children[0].disabled = False
+            self.ui_manager.children[0][0].children[1].disabled = False
+            self.ui_manager.children[0][0].children[2].disabled = False
+            self.hint_text.text = "ESC — выйти"
+            self.stage = 15
 
     def append_messages_list(self, num_strikes: int, num_missed_drons: int) -> None:
         w = self.window.width

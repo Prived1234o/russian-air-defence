@@ -1,7 +1,9 @@
 import arcade
+from constants import VERSION
 from views import Menu, End
 
-window = arcade.Window(1920, 1080, 'Российское ПВО v1.0.2', resizable=True, fullscreen=True)
+# оно resizable, т.к. иначе на Linux оно не отображается правильно
+window = arcade.Window(1920, 1080, 'российское ПВО ' + VERSION, resizable=True, fullscreen=True)
 window.activate()
 window.show_view(Menu())
 # Для дебага

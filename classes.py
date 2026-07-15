@@ -2,7 +2,7 @@ import arcade
 from math import cos, sin, radians, degrees, atan2
 from random import uniform, random
 from constants import SOUND_VOLUME, REFINERY_DRON_DAMAGE, REFINERY_OBLOMOK_DAMAGE, REFINERY_ROCKET_DAMAGE, \
-    TANK_DRON_DAMAGE, TANK_OBLOMOK_DAMAGE, PVO_DRON_DAMAGE, PVO_OBLOMOK_DAMAGE
+    TANK_DRON_DAMAGE, TANK_OBLOMOK_DAMAGE, PVO_DRON_DAMAGE, PVO_OBLOMOK_DAMAGE, PVO_ROCKET_DAMAGE
 
 print("Загрузка звуков.")
 launch_sound = arcade.load_sound('sounds/launch.mp3')
@@ -16,15 +16,17 @@ rocket_texture = arcade.load_texture('textures/pvo/rocket.png')
 dron_texture_right = arcade.load_texture('textures/dron/dron.png')
 dron_texture_left = dron_texture_right.flip_left_right()
 oblomok_texture = arcade.load_texture('textures/dron/oblomok.png')
+pvo_tower_texture = arcade.load_texture('textures/pvo/tower.png')
+pvo_texture = arcade.load_texture('textures/pvo/pvo.png')
 print("Готово.\n")
 
 class Smoke(arcade.Sprite):
-    def __init__(self, x: float, y: float, type: str = 'white'):
+    def __init__(self, x: float, y: float, smoke_type: str = 'white'):
         super().__init__()
         self.texture = smoke_texture
         self.center_x = x
         self.center_y = y
-        if type == 'fire black':
+        if smoke_type == 'fire black':
             self.scale = 0.2 * 0.75
             self.change_y = 100 * 0.75
             self.change_x = -20 * 0.75
@@ -32,7 +34,7 @@ class Smoke(arcade.Sprite):
         else:
             self.scale = 0.05 * 0.75
             self.scale_max = 0.2 * 0.75
-        self.type = type
+        self.smoke_type = smoke_type
 
     def update(self, delta_time: float = 1 / 60, *args, **kwargs):
         self.scale_x += delta_time * 0.1
@@ -42,15 +44,15 @@ class Smoke(arcade.Sprite):
         self.center_x += self.change_x * delta_time
 
         alpha = max(127 - (self.scale_x - 0.05 * 0.75) * 127 / 0.15 * 0.75, 0)
-        if self.type == 'black':
+        if self.smoke_type == 'black':
             self.color = (0, 0, 0, alpha)
-        elif self.type == 'fire white':
+        elif self.smoke_type == 'fire white':
             if self.scale_x <= 0.075 * 0.75:
                 self.color = (255, max(64 - (self.scale_x - 0.05 * 0.75) / 0.025 * 0.75 * 64, 0), 0, alpha)
             else:
                 self.color = (255, min((self.scale_x - 0.05) / 0.075 * 255, 255),
                               min((self.scale_x - 0.05) / 0.075 * 255, 255), alpha)
-        elif self.type == 'fire black':
+        elif self.smoke_type == 'fire black':
             alpha = max(127 - (self.scale_x - 0.2 * 0.75) * 127 / 0.3 * 0.75, 0)
             if self.scale_x <= 0.3 * 0.75:
                 self.color = (255, max(64 - (self.scale_x - 0.2 * 0.75) / 0.1 * 0.75 * 64, 0), 0, alpha)
@@ -137,9 +139,10 @@ class Refinery(Explosive):
         self.texture = arcade.load_texture('textures/refinery/refinery.png')
         self.center_x = x
         self.center_y = y
-        self.scale = 0.75
+        self.scale = 0.75 * view.r
 
         self.view = view
+        self.explosion_scale *= view.r
         self.setup_explosion()
 
     def check_collision(self) -> None:
@@ -153,7 +156,7 @@ class Refinery(Explosive):
             self.health -= REFINERY_OBLOMOK_DAMAGE
 
     def check_health(self) -> None:
-        self.view.refinery_health = max(self.health, 0)
+        self.view.refinery_health = min(max(self.health, 0), 100)
         if self.health <= 0:
             self.explode()
 
@@ -174,8 +177,8 @@ class Lid(Explosive):
         self.change_x = 15
         self.change_y = 225
 
-        self.scale = 0.75
-
+        self.scale = 0.75 * view.r
+        self.explosion_scale *= view.r
         self.view = view
         self.setup_explosion()
 
@@ -207,8 +210,8 @@ class Tank(Explosive):
         self.texture = arcade.load_texture('textures/tank/tank.png')
         self.center_x = x
         self.center_y = y
-        self.scale = 0.3
-
+        self.scale = 0.3 * view.r
+        self.explosion_scale *= view.r
         self.view = view
         self.setup_explosion()
 
@@ -228,9 +231,9 @@ class Tank(Explosive):
 
     def check_health(self) -> None:
         if abs(self.center_x - self.view.window.width * 0.5) <= self.view.window.width * 0.01:
-            self.view.tank1_health = max(self.health, 0)
+            self.view.tank1_health = min(max(self.health, 0), 100)
         elif abs(self.center_x - self.view.window.width * 0.63) <= self.view.window.width * 0.01:
-            self.view.tank2_health = max(self.health, 0)
+            self.view.tank2_health = min(max(self.health, 0), 100)
         if self.health <= 0:
             self.explode()
 
@@ -238,14 +241,42 @@ class Tank(Explosive):
         if self.health <= 99:
             self.view.smoke_list.append(Smoke(self.center_x, self.center_y + 50, self.smoke_type))
 
+class PvoTower(arcade.Sprite):
+    def __init__(self, view, x: float, y: float):
+        super().__init__()
+        self.center_x = x
+        self.center_y = y
+        self.texture = pvo_tower_texture
+        self.scale_x = 0.55 * view.r
+        self.scale_y = 0.39 * view.r
+
+        self.view = view
+
+    def update(self, delta_time: float = 1 / 60, *args, **kwargs) -> None:
+        oblomki = arcade.check_for_collision_with_list(self, self.view.dron_collision_list)
+        if oblomki:
+            for oblomok in oblomki:
+                oblomok.explode()
+            self.view.pvo_list[0].health -= PVO_DRON_DAMAGE
+        drons = arcade.check_for_collision_with_list(self, self.view.oblomki_collision_list)
+        if drons:
+            for dron in drons:
+                dron.explode()
+            self.view.pvo_list[0].health -= PVO_OBLOMOK_DAMAGE
+        rockets = arcade.check_for_collision_with_list(self, self.view.rocket_collision_list)
+        if rockets:
+            for rocket in rockets:
+                rocket.explode()
+            self.view.pvo_list[0].health -= PVO_ROCKET_DAMAGE
+
 class Pvo(Explosive):
     def __init__(self, view, x: float, y: float):
         super().__init__()
-        self.texture = arcade.load_texture('textures/pvo/pvo.png')
+        self.texture = pvo_texture
         self.center_x = x
         self.center_y = y
-        self.scale = 0.218
-
+        self.scale = 0.218 * view.r
+        self.explosion_scale *= view.r
         self.view = view
         self.setup_explosion()
 
@@ -256,7 +287,7 @@ class Pvo(Explosive):
             self.health -= PVO_OBLOMOK_DAMAGE
 
     def check_health(self) -> None:
-        self.view.pvo_health = max(self.health, 0)
+        self.view.pvo_health = min(max(self.health, 0), 100)
         if self.health <= 0:
             self.explode()
 
@@ -303,8 +334,6 @@ class Projectile(Explosive):
             elif self.turning_right:
                 self.turn(delta_time)
 
-            # self.speed += self.gravity * delta_time
-
             self.change_x = self.speed * sin(radians(self.rotation))
             self.change_y = self.speed * cos(radians(self.rotation))
             self.center_x += self.change_x * delta_time
@@ -342,13 +371,14 @@ class PvoRocket(Projectile):
         super().__init__()
         arcade.play_sound(launch_sound, SOUND_VOLUME)
         self.texture = rocket_texture
-        self.scale = 0.225
+        self.scale = 0.225 * view.r
         self.turn_right(rot)
 
         self.center_x = x
         self.center_y = y
         self.rotation = rot
 
+        self.explosion_scale *= view.r
         self.view = view
         self.setup_explosion()
         self.append_to_collision_list()
@@ -385,7 +415,7 @@ class Dron(Projectile):
                 self.texture = dron_texture_right
             else:
                 self.texture = dron_texture_left
-        self.scale = 0.188
+        self.scale = 0.188 * view.r
 
         self.center_x = x
         self.center_y = y
@@ -397,6 +427,7 @@ class Dron(Projectile):
         if speed:
             self.speed = speed
 
+        self.explosion_scale *= view.r
         self.view = view
         self.setup_explosion()
         self.append_to_collision_list()
