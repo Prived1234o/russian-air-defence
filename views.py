@@ -38,8 +38,9 @@ messages = \
      # 'sobyanin 0':    (arcade.load_texture('textures/messages/sobyanin 0.jpg'), 0.96, 0.422),
      'sobyanin template': (arcade.load_texture('textures/messages/sobyanin template.jpg'), 0.96, 0.422)
      }
-arcade.load_font('fonts/OpenSans-Regular.ttf')
 health_texture = arcade.load_texture('textures/empty health.png')
+arcade.load_font('fonts/OpenSans-Regular.ttf')
+font_times_new_roman = ("Times New Roman", "Times", "Liberation Serif")
 print("Готово!")
 
 prices: dict[str, int] = {'pvo': 1_200_435_200, 'rocket': 9_514_610, 'dron': 18_012_700, 'tank': 730_656_507, 'refinery': 893_980_440_000}
@@ -446,6 +447,7 @@ class End(arcade.View):
         super().__init__()
         w = self.window.width
         h = self.window.height
+        self.r = w / 1536
 
         self.time = -0.5
         self.stage = 0
@@ -486,8 +488,9 @@ class End(arcade.View):
         self.messages_batch = Batch()
         self.messages_rect = arcade.LRBT(0, w * 0.23, 0, h * 0.9)
         self.messages_text = arcade.Text('ОФИЦИАЛЬНЫЕ СООБЩЕНИЯ', self.messages_rect.center_x, h * 0.96,
-                                         color=arcade.color.BLACK, font_size=25, width=int(self.messages_rect.width),
-                                         multiline=True, anchor_x='center', align='center')
+                                         color=arcade.color.BLACK, font_size=25*self.r,
+                                         width=int(self.messages_rect.width), multiline=True,
+                                         anchor_x='center', align='center')
         self.messages_list: list[tuple[arcade.Texture, arcade.Rect]] = []
         self.messages_data_list: list[arcade.Text] = []
         self.messages_texts: list[arcade.Text] = []
@@ -498,13 +501,13 @@ class End(arcade.View):
         self.tables_batch = Batch()
         self.report_rect = arcade.LRBT(w * 0.3, w * 0.99, h * 0.4, h * 0.98)
         self.report_text = arcade.Text('ОТЧЁТ', self.report_rect.center_x, h * 0.9,
-                                       color=arcade.color.BLACK, font_name=("Times New Roman", "Times", "Liberation Serif"),
-                                       font_size=40, width=int(w * 0.2), anchor_x='center')
+                                       color=arcade.color.BLACK, font_name=font_times_new_roman,
+                                       font_size=40*self.r, width=int(w * 0.2), anchor_x='center')
 
         # Таблица "Результаты выполнения поставленных задач"
         self.table_drons_title = arcade.Text('Результат выполнения поставленных задач',
                                              w * 0.475, h * 0.82, color=arcade.color.BLACK,
-                                             font_size=18, font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                             font_size=18*self.r, font_name=font_times_new_roman,
                                              anchor_x='center', align='center', batch=self.tables_batch)
         self.table_drons = ((w * 0.32, h * 0.8), (w * 0.32, h * 0.5),
                             (w * 0.553, h * 0.8), (w * 0.553, h * 0.5),
@@ -517,12 +520,11 @@ class End(arcade.View):
                             (w * 0.32, h * 0.555), (w * 0.63, h * 0.555),
                             (w * 0.32, h * 0.5), (w * 0.63, h * 0.5))
         self.table_drons_header: list[arcade.Text] = []
-        self.table_drons_header.append(arcade.Text('наименование', w * 0.437, h * 0.78,
-                                                   color=arcade.color.BLACK, font_name=("Times New Roman", "Times", "Liberation Serif"),
+        self.table_drons_header.append(arcade.Text('наименование', w * 0.437, h * 0.78, color=arcade.color.BLACK,
+                                                   font_name=font_times_new_roman, font_size=12*self.r,
                                                    anchor_x='center', align='center', batch=self.tables_batch))
-        self.table_drons_header.append(arcade.Text('значение', w * 0.592, h * 0.78,
-                                                   color=arcade.color.BLACK,
-                                                   font_name=("Times New Roman", "Times", "Liberation Serif"),
+        self.table_drons_header.append(arcade.Text('значение', w * 0.592, h * 0.78, color=arcade.color.BLACK,
+                                                   font_name=font_times_new_roman, font_size=12*self.r,
                                                    anchor_x='center', align='center', batch=self.tables_batch))
         try:
             percentage_text = f'{num_strikes / (num_missed_drons + num_strikes) * 100: 0.2f}%'
@@ -541,13 +543,13 @@ class End(arcade.View):
         line_num = 0
         for line in table_drons_contents:
             new_position_text = arcade.Text(line[0], w * 0.437, h * (0.735 - line_num * 0.055),
-                                            color=arcade.color.BLACK, font_size=16,
-                                            font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                            color=arcade.color.BLACK, font_size=16*self.r,
+                                            font_name=font_times_new_roman,
                                             anchor_x='center', align='center', batch=self.tables_batch)
             new_position_text.visible = False
             new_value_text = arcade.Text(line[1], w * 0.592, h * (0.735 - line_num * 0.055),
-                                         color=arcade.color.BLACK, font_size=16,
-                                         font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                         color=arcade.color.BLACK, font_size=16*self.r,
+                                         font_name=font_times_new_roman,
                                          anchor_x='center', align='center', batch=self.tables_batch)
             new_value_text.visible = False
             self.table_drons_contents.append(new_position_text)
@@ -557,7 +559,7 @@ class End(arcade.View):
         # Таблица "Нанесённый ущерб"
         self.table_destruction_title = arcade.Text('Нанесённый ущерб',
                                              w * 0.825, h * 0.82, color=arcade.color.BLACK,
-                                             font_size=18, font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                             font_size=18*self.r, font_name=font_times_new_roman,
                                              anchor_x='center', align='center', batch=self.tables_batch)
         self.table_destruction = ((w * 0.67, h * 0.8), (w * 0.67, h * 0.5),
                                   (w * 0.84, h * 0.8), (w * 0.84, h * 0.555),
@@ -571,18 +573,21 @@ class End(arcade.View):
                                   (w * 0.67, h * 0.555), (w * 0.98, h * 0.555),
                                   (w * 0.67, h * 0.5), (w * 0.98, h * 0.5))
         self.table_destruction_header: list[arcade.Text] = []
-        self.table_destruction_header.append(arcade.Text('наименование', w * 0.76, h * 0.78,
-                                                         color=arcade.color.BLACK,
-                                                         font_name=("Times New Roman", "Times", "Liberation Serif"),
-                                                         anchor_x='center', align='center', batch=self.tables_batch))
-        self.table_destruction_header.append(arcade.Text('кол-во', w * 0.859, h * 0.78,
-                                                         color=arcade.color.BLACK,
-                                                         font_name=("Times New Roman", "Times", "Liberation Serif"),
-                                                         anchor_x='center', align='center', batch=self.tables_batch))
-        self.table_destruction_header.append(arcade.Text('сумма ущерба, руб', w * 0.929, h * 0.78,
-                                                         color=arcade.color.BLACK,
-                                                         font_name=("Times New Roman", "Times", "Liberation Serif"),
-                                                         anchor_x='center', align='center', batch=self.tables_batch))
+        self.table_destruction_header.append(
+            arcade.Text('наименование', w * 0.76, h * 0.78, color=arcade.color.BLACK,
+                        font_name=font_times_new_roman, font_size=12*self.r,
+                        anchor_x='center', align='center', batch=self.tables_batch)
+        )
+        self.table_destruction_header.append(
+            arcade.Text('кол-во', w * 0.859, h * 0.78, color=arcade.color.BLACK,
+                        font_name=font_times_new_roman, font_size=12*self.r,
+                        anchor_x='center', align='center', batch=self.tables_batch)
+        )
+        self.table_destruction_header.append(
+            arcade.Text('сумма ущерба, руб', w * 0.929, h * 0.78, color=arcade.color.BLACK,
+                        font_name=font_times_new_roman, font_size=12*self.r,
+                        anchor_x='center', align='center', batch=self.tables_batch)
+        )
         table_destruction_contents = ((num_launched_rockets, 'Ракеты для ПВО',
                                                             f'{num_launched_rockets}', f'{self.price_rockets: _}'.replace("_", " ")),
                                       (100 - pvo_health, 'ПВО',
@@ -599,50 +604,50 @@ class End(arcade.View):
             if damage == 0:
                 continue
             new_position_text = arcade.Text(line[1], w * 0.76, h * (0.735 - line_num * 0.055),
-                                            color=arcade.color.BLACK, font_size=16,
-                                            font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                            color=arcade.color.BLACK, font_size=16*self.r,
+                                            font_name=font_times_new_roman,
                                             anchor_x='center', align='center', batch=self.tables_batch)
             new_position_text.visible = False
             new_value1_text = arcade.Text(line[2], w * 0.859, h * (0.735 - line_num * 0.055),
-                                          color=arcade.color.BLACK, font_size=16,
-                                          font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                          color=arcade.color.BLACK, font_size=16*self.r,
+                                          font_name=font_times_new_roman,
                                           anchor_x='center', align='center', batch=self.tables_batch)
             new_value1_text.visible = False
             new_value2_text = arcade.Text(line[3], w * 0.929, h * (0.735 - line_num * 0.055),
-                                          color=arcade.color.BLACK, font_size=16,
-                                          font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                          color=arcade.color.BLACK, font_size=16*self.r,
+                                          font_name=font_times_new_roman,
                                           anchor_x='center', align='center', batch=self.tables_batch)
             new_value2_text.visible = False
             self.table_destruction_contents.append([new_position_text, new_value1_text, new_value2_text])
             line_num += 1
 
         self.table_destruction_contents.append([arcade.Text('Итого:', w * 0.76, h * 0.515,
-                                                             color=arcade.color.BLACK, font_size=16,
-                                                             font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                                             color=arcade.color.BLACK, font_size=16*self.r,
+                                                             font_name=font_times_new_roman,
                                                              anchor_x='center', align='center', batch=self.tables_batch),
                                                 arcade.Text(f'{self.total_price:_}'.replace('_', ' '), w * 0.929, h * 0.515,
-                                                            color=arcade.color.BLACK, font_size=16,
-                                                            font_name=("Times New Roman", "Times", "Liberation Serif"),
+                                                            color=arcade.color.BLACK, font_size=16*self.r,
+                                                            font_name=font_times_new_roman,
                                                             anchor_x='center', align='center', batch=self.tables_batch)])
 
         self.player_stats_batch = Batch()
         # Счёт, Лучший     Время, Лучшее
         self.score_text = arcade.Text(f'Счёт: {score}', w * 0.3, h * 0.34,
-                                      color=arcade.color.BLACK, font_size=40,
+                                      color=arcade.color.BLACK, font_size=40*self.r,
                                       anchor_x='left', batch=self.player_stats_batch)
         self.score_text.visible = False
         self.best_score_text = arcade.Text(f'Лучший: {best_score}', w * 0.3, h * 0.30,
-                                            color=arcade.color.BLACK, font_size=20,
+                                            color=arcade.color.BLACK, font_size=20*self.r,
                                             anchor_x='left', batch=self.player_stats_batch)
         self.best_score_text.visible = False
         if self.new_best_score:
             self.best_score_text.text += '  Новый рекорд!'
         self.time_text = arcade.Text(f'Время: {time_str}', w * 0.3, h * 0.24,
-                                     color=arcade.color.BLACK, font_size=40,
+                                     color=arcade.color.BLACK, font_size=40*self.r,
                                      anchor_x='left', batch=self.player_stats_batch)
         self.time_text.visible = False
         self.best_time_text = arcade.Text(f'Лучшее: {best_time}', w * 0.3, h * 0.20,
-                                          color=arcade.color.BLACK, font_size=20,
+                                          color=arcade.color.BLACK, font_size=20*self.r,
                                           anchor_x='left', batch=self.player_stats_batch)
         self.best_time_text.visible = False
         if self.new_best_time:
@@ -682,17 +687,17 @@ class End(arcade.View):
         self.rates_visible = False
         self.rating_text = arcade.Text('Рейтинг «единой россии»:                   за эту неделю',
                                        w * 0.55, h * 0.3,
-                                       color=arcade.color.BLACK, font_size=20,
+                                       color=arcade.color.BLACK, font_size=20*self.r,
                                        anchor_y='center', anchor_x='left', batch=self.rates_batch)
         self.rating_rate_text = arcade.Text(f'{rating_rate: 0.2f}%', w * 0.807, h * 0.3,
-                                            color=(127, 0, 0), font_size=20,
+                                            color=(127, 0, 0), font_size=20*self.r,
                                             anchor_y='center', anchor_x='right', batch=self.rates_batch)
         self.fuel_text = arcade.Text('Цены на бензин:                      за эту неделю',
                                      w * 0.55, h * 0.26,
-                                     color=arcade.color.BLACK, font_size=20,
+                                     color=arcade.color.BLACK, font_size=20*self.r,
                                      anchor_y='center', anchor_x='left', batch=self.rates_batch)
         self.fuel_rate_text = arcade.Text(f'+{fuel_rate: 0.2f}%', w * 0.747, h * 0.26,
-                                          color=(127, 0, 0), font_size=20,
+                                          color=(127, 0, 0), font_size=20*self.r,
                                           anchor_y='center', anchor_x='right', batch=self.rates_batch)
 
         # Кнопки
@@ -735,7 +740,8 @@ class End(arcade.View):
             self.window.close()
         button_quit.disabled = True
 
-        self.hint_text = arcade.Text("ESC — выйти    Пробел — пропустить", w / 2, 10, arcade.color.BLACK,
+        self.hint_text = arcade.Text("ESC — выйти    Пробел — пропустить", w / 2, 10,
+                                     color=arcade.color.BLACK, font_size=12*self.r,
                                      width=100, anchor_x="center", align="center")
 
         self.ui_manager.enable()
@@ -911,7 +917,7 @@ class End(arcade.View):
                         self.messages_texts.append(
                             arcade.Text(f'{dron}', x=w * 0.005 + w * message_width * message[4 + text_field][0],
                                         y=h * 0.895 - lowest_bottom - message_height * message[4 + text_field][1],
-                                        font_name='OpenSans-Regular', font_size=8.4, anchor_x='left', anchor_y='top',
+                                        font_name='OpenSans-Regular', font_size=8.4*self.r, anchor_x='left', anchor_y='top',
                                         batch=self.messages_batch
                                         )
                     )
@@ -935,7 +941,7 @@ class End(arcade.View):
                         self.messages_texts.append(
                             arcade.Text(f'{drons}', x=w * 0.005 + w * message_width * message[4][0],
                                         y=h * 0.895 - lowest_bottom - message_height * message[4][1],
-                                        font_name='OpenSans-Regular', font_size=8.4, anchor_x='left', anchor_y='top',
+                                        font_name='OpenSans-Regular', font_size=8.4*self.r, anchor_x='left', anchor_y='top',
                                         batch=self.messages_batch
                                         )
                         )
@@ -947,7 +953,7 @@ class End(arcade.View):
                         arcade.Text(messages_texts[randint(0, len(messages_texts) - 1)] +
                                     sobyanin_message_endings[round(triangular(0, 3, 4))],
                                 x=w * 0.0135, y=h * 0.8722 - lowest_bottom, font_name='OpenSans-Regular',
-                                font_size=8.4, anchor_x='left', anchor_y='top',
+                                font_size=8.4*self.r, anchor_x='left', anchor_y='top',
                                 width=w * 0.21 * (0.96 - 0.01), multiline=True, batch=self.messages_batch
                                 )
                     )
@@ -963,7 +969,7 @@ class End(arcade.View):
                 self.messages_texts.append(
                     arcade.Text(sobyanin_end[idx],
                                 x=w * 0.0135, y=h * 0.8722 - lowest_bottom, font_name='OpenSans-Regular',
-                                font_size=8.4, anchor_x='left', anchor_y='top',
+                                font_size=8.4*self.r, anchor_x='left', anchor_y='top',
                                 width=w * 0.21 * (0.96 - 0.01), multiline=True, batch=self.messages_batch
                                 )
                 )
@@ -983,7 +989,7 @@ class End(arcade.View):
                 data_text = arcade.Text(
                     f'{views}   {'0' if hours < 10 else ''}{hours}:{'0' if minutes < 10 else ''}{minutes}',
                     x=w * (0.005 + message_width - 0.03), y=h * 0.906 - message_height - lowest_bottom,
-                    font_size=8.4, font_name='OpenSans-Regular', color=(131, 142, 147),
+                    font_size=8.4*self.r, font_name='OpenSans-Regular', color=(131, 142, 147),
                     anchor_x='left', anchor_y='center', batch=self.messages_batch)
                 if comments:
                     data_text.y = h * 0.942 - message_height - lowest_bottom
