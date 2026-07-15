@@ -19,7 +19,7 @@
 * Открыть Powershell (или другую коммандную строку, без разницы) и вписать: `pip install arcade`.
 Это устанавливает библиотеку, на которой работает игра.
 * Скачать архив с игрой из [Releases](https://github.com/Prived1234o/russian-air-defence/releases)
-* Запустить _russian_air_defence.py_
+* Запустить _russian air defence.py_
 
 ## Дальнейшее обновление
 > [!WARNING]
