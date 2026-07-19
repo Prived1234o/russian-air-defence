@@ -136,7 +136,6 @@ class Menu(arcade.View):
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         if symbol == arcade.key.ESCAPE:
             self.window.close()
-        print(symbol)
 
 class Game(arcade.View):
     num_rockets = 0
