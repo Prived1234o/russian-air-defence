@@ -2,6 +2,9 @@
 > Game only available in russian. For now...
 
 # российское ПВО
+![](gameplay%20demo.png)
+<sup>_Демострация игрового процесса_</sup>
+
 ## Об игре
 Эта игра написана на Python и использует библиотеку arcade.
 
