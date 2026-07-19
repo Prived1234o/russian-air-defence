@@ -207,14 +207,16 @@ class Game(arcade.View):
         self.pause_text = arcade.Text("Игра на паузе", self.window.width / 2, self.window.height * 0.76,
                                       color=arcade.color.BLACK, font_size=40*self.r,
                                       anchor_x='center', anchor_y='center', align='center', batch=self.text_batch)
+        self.text_hint_rect = arcade.XYWH(self.window.width / 2, self.window.height * 0.76,
+                                          self.window.width * 0.4, self.window.height * 0.3)
         self.end_text = arcade.Text("Атака окончена", self.window.width / 2, self.window.height * 0.8,
                                     color=arcade.color.BLACK, font_size=40*self.r,
                                     anchor_x='center', align='center', batch=self.text_batch)
-        self.end_text_hint = arcade.Text("Для выхода в меню нажмите E", self.window.width / 2, self.window.height * 0.7,
-                                    color=arcade.color.BLACK, font_size=20*self.r,
-                                    anchor_x='center', align='center', batch=self.text_batch)
-        self.text_hint_rect = arcade.XYWH(self.window.width / 2, self.window.height * 0.76,
-                                          self.window.width * 0.4, self.window.height * 0.3)
+        self.end_text_hint = arcade.Text("Для выхода в меню нажмите E\nДля перезапуска нажмите R",
+                                         self.window.width / 2, self.window.height * 0.72,
+                                         color=arcade.color.BLACK, font_size=20*self.r,
+                                         width=int(self.text_hint_rect.width), multiline=True,
+                                         anchor_x='center', align='center', batch=self.text_batch)
 
         self.background_rect = arcade.XYWH(self.window.width * 0.5, self.window.height * 0.55,
                                            self.window.width, self.window.height)
