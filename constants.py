@@ -1,4 +1,4 @@
-VERSION = 'v1.1.0'
+VERSION = 'v1.1.1'
 
 TIME_BETWEEN_TEXT = 0.3 # секунд
 TIME_TO_LAST_STAGE = 0.5 # секунд

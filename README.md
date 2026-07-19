@@ -13,12 +13,18 @@
 Большего и не нужно!
 
 ## Как запустить
-Чтобы запустить игру надо:
-* Скачать python. Вот ссылка на установщик для Windows: https://www.python.org/ftp/python/3.14.6/python-3.14.6-amd64.exe .
-На Linux: `sudo <ваш пакетный менеджер> python`
-* Открыть Powershell (или другую коммандную строку, без разницы) и вписать: `pip install arcade`.
-Это устанавливает библиотеку, на которой работает игра.
-* Скачать архив с игрой из [Releases](https://github.com/Prived1234o/russian-air-defence/releases)
+### Windows
+* Скачать Python. Ссылка на установщик: https://www.python.org/ftp/python/3.14.6/python-3.14.6-amd64.exe .
+* Открыть Powershell или cmd и вписать: `pip install arcade` это устанавливает библиотеку, на которой работает игра.
+* Скачать архив с игрой из [Releases](https://github.com/Prived1234o/russian-air-defence/releases) и распаковать его.
+* Запустить _russian air defence.py_
+### Другие ОС (также работает на Windows)
+* Скачать Python: `sudo <ваш пакетный менеджер> python`. Для Windows скачивание рассмотрено [выше](#Windows).
+* Открыть коммандную строку в папке со всеми файлами игры и вписать:
+  1) `python -m venv venv` или `python3 -m venv venv`
+  2) `source venv/bin/activate`. В зависимости от ОС и CLI нужно добавить в конце _.fish_. 
+На Windows: `"venv/Scripts/activate"`
+  3) `pip install arcade` 
 * Запустить _russian air defence.py_
 
 ## Дальнейшее обновление
