@@ -16,7 +16,7 @@ style_keybind_button: dict[str, UITextureButtonStyle] = {}
 print("Загрузка текстур (2/2).")
 button_texture_regular = arcade.load_texture('textures/gui/button regular.png')
 button_texture_interact = arcade.load_texture('textures/gui/button interact.png')
-button_texture_disabled = arcade.load_texture('textures/gui/button disabled.png')
+# button_texture_disabled = arcade.load_texture('textures/gui/button disabled.png')
 # checkbox_texture_on = arcade.load_texture('textures/gui/checkbox on.png')
 # checkbox_texture_off = arcade.load_texture('textures/gui/checkbox off.png')
 
