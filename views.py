@@ -87,7 +87,7 @@ class Menu(arcade.View):
                                               multiline=True, width=w * 0.28, batch=self.batch)
         self.game_controls_text.text = """
         В этой увлекательной* игре вы сможете попробовать себя в роли российского военного и \
-предстанете перед судом сможете управлять установкой ПВО. Вам нужно будет как можно дольше защищать НПЗ от \
+̶п̶р̶е̶д̶с̶т̶а̶н̶е̶т̶е̶ ̶п̶е̶р̶е̶д̶ ̶с̶у̶д̶о̶м̶ сможете управлять установкой ПВО. Вам нужно будет как можно дольше защищать НПЗ от \
 украинских беспилотников. А если вы не справитесь...
 
         Чтобы запустить ракету, нажмите <ЛКМ>, и ракета полетит в сторону курсора.
@@ -130,8 +130,6 @@ class Menu(arcade.View):
     def on_draw(self) -> bool | None:
         self.clear()
         arcade.draw_rect_filled(arcade.LRBT(0, self.window.width, 0, self.window.height * 0.035), arcade.color.WHITE)
-        arcade.draw_line(self.window.width * 0.02, self.window.height * 0.62,
-                         self.window.width * 0.16, self.window.height * 0.62, arcade.color.BLACK, line_width=2*self.r)
         self.batch.draw()
         self.ui_manager.draw()
 
