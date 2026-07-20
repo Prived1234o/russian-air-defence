@@ -2,7 +2,7 @@
 > Game only available in russian. For now...
 
 # российское ПВО
-![](gameplay%20demo.png)
+![Демонстрация игрового процесса](gameplay%20demo.png)
 <sup>_Демострация игрового процесса_</sup>
 
 ## Об игре
@@ -28,7 +28,7 @@
   2) `source venv/bin/activate`. В зависимости от ОС и CLI нужно добавить в конце _.fish_. 
 На Windows: `"venv/Scripts/activate"`
   3) `pip install arcade` 
-* Запустить _russian air defence.py_
+* Запустить _russian air defence.py_ (`python -m "russian air defence.py"` или `python3 -m "russian air defence.py"`)
 
 ## Дальнейшее обновление
 > [!IMPORTANT]
