@@ -226,6 +226,9 @@ class Game(arcade.View):
         self.num_missed_drons = 0
         self.num_industry_strikes = 0
 
+        self.num_rockets = 0
+        self.num_drons = 0
+
         self.time = 0
 
         self.time_since_last_dron = 0
