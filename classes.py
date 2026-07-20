@@ -12,56 +12,90 @@ print("Готово.\n")
 print("Загрузка текстур (1/2).")
 bom_gif = arcade.load_animated_gif('gifs/bom transparent 1.gif')
 smoke_texture = arcade.load_texture('textures/smoke.png')
-rocket_texture = arcade.load_texture('textures/pvo/rocket.png')
+
 dron_texture_right = arcade.load_texture('textures/dron/dron.png')
 dron_texture_left = dron_texture_right.flip_left_right()
 oblomok_texture = arcade.load_texture('textures/dron/oblomok.png')
+
+tank_texture = arcade.load_texture('textures/tank/tank.png')
+lid_texture = arcade.load_texture('textures/tank/lid.png')
+refinery_texture = arcade.load_texture('textures/refinery/refinery.png')
+
+rocket_texture = arcade.load_texture('textures/pvo/rocket.png')
 pvo_tower_texture = arcade.load_texture('textures/pvo/tower.png')
 pvo_texture = arcade.load_texture('textures/pvo/pvo.png')
 print("Готово.\n")
 
-class Smoke(arcade.Sprite):
-    def __init__(self, x: float, y: float, smoke_type: str = 'white'):
+class WhiteSmoke(arcade.Sprite):
+    scale_max = 0.15
+    expansion_rate = 0.1
+
+    change_x = 0
+    change_y = 0
+
+    def __init__(self, view, x: float, y: float):
         super().__init__()
         self.texture = smoke_texture
         self.center_x = x
         self.center_y = y
-        if smoke_type == 'fire black':
-            self.scale = 0.2 * 0.75
-            self.change_y = 100 * 0.75
-            self.change_x = -20 * 0.75
-            self.scale_max = 0.5 * 0.75
-        else:
-            self.scale = 0.05 * 0.75
-            self.scale_max = 0.2 * 0.75
-        self.smoke_type = smoke_type
+
+        self.r = view.r
+        self.scale = 0.0375 * self.r
+        self.scale_max *= self.r
+        self.change_x *= self.r
+        self.change_y *= self.r
 
     def update(self, delta_time: float = 1 / 60, *args, **kwargs):
-        self.scale_x += delta_time * 0.1
-        self.scale_y += delta_time * 0.1
+        self.scale_x += self.expansion_rate * self.r * delta_time
+        self.scale_y += self.expansion_rate * self.r * delta_time
 
         self.center_y += self.change_y * delta_time
         self.center_x += self.change_x * delta_time
 
-        alpha = max(127 - (self.scale_x - 0.05 * 0.75) * 127 / 0.15 * 0.75, 0)
-        if self.smoke_type == 'black':
-            self.color = (0, 0, 0, alpha)
-        elif self.smoke_type == 'fire white':
-            if self.scale_x <= 0.075 * 0.75:
-                self.color = (255, max(64 - (self.scale_x - 0.05 * 0.75) / 0.025 * 0.75 * 64, 0), 0, alpha)
-            else:
-                self.color = (255, min((self.scale_x - 0.05) / 0.075 * 255, 255),
-                              min((self.scale_x - 0.05) / 0.075 * 255, 255), alpha)
-        elif self.smoke_type == 'fire black':
-            alpha = max(127 - (self.scale_x - 0.2 * 0.75) * 127 / 0.3 * 0.75, 0)
-            if self.scale_x <= 0.3 * 0.75:
-                self.color = (255, max(64 - (self.scale_x - 0.2 * 0.75) / 0.1 * 0.75 * 64, 0), 0, alpha)
-            else:
-                self.color = (max(255 - (self.scale_x - 0.2 * 0.75) / 0.05 * 0.75 * 255, 0), 0, 0, alpha)
-        else:
-            self.alpha = alpha
+        alpha = max(127 - (self.scale_x - 0.0375) * 127 / (self.scale_max - 0.0375), 0)
+        self.update_color_alpha(int(alpha))
+
         if self.scale_x >= self.scale_max:
             self.kill()
+
+    def update_color_alpha(self, alpha: int):
+        self.alpha = alpha
+
+class BlackSmoke(WhiteSmoke):
+    def __init__(self, view, x: float, y: float):
+        super().__init__(view, x, y)
+
+    def update_color_alpha(self, alpha: int):
+        self.color = (0, 0, 0, alpha)
+
+class FireWhiteSmoke(WhiteSmoke):
+    def __init__(self, view, x: float, y: float):
+        super().__init__(view, x, y)
+
+    def update_color_alpha(self, alpha: int):
+        if self.scale_x <= 0.056:
+            self.color = (255, max(64 - 64 * (self.scale_x - 0.0375) / 0.0185, 0), 0, alpha)
+        else:
+            green = blue = min(255 * (self.scale_x - 0.056) / 0.05, 255)
+            self.color = (255, green, blue, alpha)
+
+class FireBlackSmoke(WhiteSmoke):
+    scale_max = 0.375
+    expansion_rate = 0.05
+
+    change_y = 75
+    change_x = -15
+
+    def __init__(self, view, x: float, y: float):
+        super().__init__(view, x, y)
+        self.scale = 0.15 * self.r
+
+    def update_color_alpha(self, alpha: int):
+        alpha = max(127 - 127 * (self.scale_x - 0.15) / (self.scale_max - 0.15), 0)
+        if self.scale_x <= 0.2:
+            self.color = (255, max(64 - 64 * (self.scale_x - 0.15) / 0.05, 0), 0, alpha)
+        else:
+            self.color = (max(255 - 255 * (self.scale_x - 0.2) / 0.1, 0), 0, 0, alpha)
 
 class Explosive(arcade.Sprite):
     exploding = False
@@ -70,7 +104,8 @@ class Explosive(arcade.Sprite):
     explosion_list = None
     explosion_scale = 0.375
 
-    smoke_type = ''
+    smoke_type = None
+    time_between_smoke = 0.5
 
     view = None
 
@@ -114,7 +149,7 @@ class Explosive(arcade.Sprite):
     def update(self, delta_time: float = 1 / 60, *args, **kwargs):
         self.time += delta_time
 
-        if self.time >= 0.5 and self.smoke_type:
+        if self.time >= self.time_between_smoke and self.smoke_type:
             self.time = 0
             self.create_smoke()
 
@@ -132,11 +167,11 @@ class Explosive(arcade.Sprite):
 class Refinery(Explosive):
     explosion_scale = 1.5
 
-    smoke_type = 'fire black'
+    smoke_type = FireBlackSmoke
 
     def __init__(self, view, x: float, y: float):
         super().__init__()
-        self.texture = arcade.load_texture('textures/refinery/refinery.png')
+        self.texture = refinery_texture
         self.center_x = x
         self.center_y = y
         self.scale = 0.75 * view.r
@@ -161,17 +196,18 @@ class Refinery(Explosive):
             self.explode()
 
     def create_smoke(self) -> None:
+        r = self.view.r
         if self.health <= 60:
-            self.view.smoke_list.append(Smoke(self.center_x, self.center_y, self.smoke_type))
+            self.view.smoke_list.append(self.smoke_type(self.view, self.center_x, self.center_y))
         if self.health <= 40:
-            self.view.smoke_list.append(Smoke(self.center_x - 140, self.center_y + 30, self.smoke_type))
+            self.view.smoke_list.append(self.smoke_type(self.view,self.center_x - 140*r, self.center_y + 30*r))
         if self.health <= 20:
-            self.view.smoke_list.append(Smoke(self.center_x + 200, self.center_y - 50, self.smoke_type))
+            self.view.smoke_list.append(self.smoke_type(self.view,self.center_x + 200*r, self.center_y - 50*r))
 
 class Lid(Explosive):
     def __init__(self, view, x: float, y: float):
         super().__init__()
-        self.texture = arcade.load_texture('textures/tank/lid.png')
+        self.texture = lid_texture
         self.center_x = x
         self.center_y = y
         self.change_x = 15
@@ -203,11 +239,11 @@ class Lid(Explosive):
 
 class Tank(Explosive):
     explosion_scale = 0.75
-    smoke_type = 'fire black'
+    smoke_type = FireBlackSmoke
 
     def __init__(self, view, x: float, y: float):
         super().__init__()
-        self.texture = arcade.load_texture('textures/tank/tank.png')
+        self.texture = tank_texture
         self.center_x = x
         self.center_y = y
         self.scale = 0.3 * view.r
@@ -239,7 +275,7 @@ class Tank(Explosive):
 
     def create_smoke(self) -> None:
         if self.health <= 99:
-            self.view.smoke_list.append(Smoke(self.center_x, self.center_y + 50, self.smoke_type))
+            self.view.smoke_list.append(self.smoke_type(self.view,self.center_x, self.center_y + 50 * self.view.r))
 
 class PvoTower(arcade.Sprite):
     def __init__(self, view, x: float, y: float):
@@ -295,7 +331,7 @@ class Projectile(Explosive):
     collision = True
     rotation = 0
     speed = 675
-    smoke_type = 'white'
+    smoke_type = WhiteSmoke
 
     target: Refinery | Tank | Pvo = None
     path_to_target: list[tuple[float, float]] = None
@@ -339,9 +375,9 @@ class Projectile(Explosive):
             self.center_x += self.change_x * delta_time
             self.center_y += self.change_y * delta_time
 
-            if self.time >= 26 / self.speed:
+            if self.time >= self.time_between_smoke:
                 self.time = 0
-                self.view.smoke_list.append(Smoke(self.center_x, self.center_y, self.smoke_type))
+                self.view.smoke_list.append(self.smoke_type(self.view, self.center_x, self.center_y))
 
             if self.center_y <= 200:
                 self.miss()
@@ -364,8 +400,9 @@ class Projectile(Explosive):
             self.kill()
 
 class PvoRocket(Projectile):
-    smoke_type = 'fire white'
+    smoke_type = FireWhiteSmoke
     speed = 800
+    time_between_smoke = 0.0325
 
     def __init__(self, view, x: float, y: float, rot: float = 0):
         super().__init__()
@@ -402,6 +439,7 @@ class PvoRocket(Projectile):
 
 class Dron(Projectile):
     speed = 450
+    time_between_smoke = 0.075
 
     def __init__(self, view, x: float, y: float, speed: float = None, rot: float = 270, texture=None):
         """
@@ -522,7 +560,8 @@ class Dron(Projectile):
 
 class Oblomok(Dron):
     speed = 150
-    smoke_type = 'black'
+    smoke_type = BlackSmoke
+    time_between_smoke = 0.173
 
     def explosion1(self):
         pass

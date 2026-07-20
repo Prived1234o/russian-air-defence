@@ -5,8 +5,8 @@ from classes import Pvo, PvoTower, PvoRocket, Dron, Refinery, Tank
 from math import degrees, atan2, sin, radians
 from random import randint, triangular, shuffle, uniform
 from constants import (TIME_BETWEEN_DRONS, NEW_DRON_SPEED_MULT, MAX_DRONS, MAX_ROCKETS, NEW_DRON_SPEED_0, STRIKE_COEFF,
-    LOST_ROCKETS_COEFF, MISSED_DRONS_COEFF, DAMAGE_COEFF, INDUSTRY_STRIKE_COEFF, VERSION, TIME_BETWEEN_TEXT,
-    TIME_TO_LAST_STAGE)
+                       LOST_ROCKETS_COEFF, MISSED_DRONS_COEFF, DAMAGE_COEFF, INDUSTRY_STRIKE_COEFF, VERSION, TIME_BETWEEN_TEXT,
+                       TIME_TO_LAST_TEXT_STAGE)
 import json
 from os.path import exists
 
@@ -23,7 +23,7 @@ button_texture_interact = arcade.load_texture('textures/gui/button interact.png'
 # Сообщения для конечного экрана
 # {название: (текстура, отн. ширина (1 = 544p), отн. высота (1 = 360p)}, кол-во позиций для текста,
 #                                                                       (только у moskva 24 и tass)
-#                                               (отн. x, отн. y), (отн. x, отн. y), ...
+#                            /положение позиций для текста: /    (отн. x, отн. y), (отн. x, отн. y), ...
 messages = \
     {'moskva 24 0':   (arcade.load_texture('textures/messages/moskva 24 0.jpg'), 1, 0.8, 3,
                                                                         (0.16, 0.11), (0.315, 0.34), (0.465, 0.57)),
@@ -814,7 +814,7 @@ class End(arcade.View):
             self.rates_visible = True
             self.stage += 1
             self.time = 0
-        if self.stage == 10 + table_destruction_lines and self.time >= TIME_TO_LAST_STAGE:
+        if self.stage == 10 + table_destruction_lines and self.time >= TIME_TO_LAST_TEXT_STAGE:
             self.ui_manager.children[0][0].children[0].disabled = False
             self.ui_manager.children[0][0].children[1].disabled = False
             self.ui_manager.children[0][0].children[2].disabled = False

@@ -1,16 +1,20 @@
 VERSION = 'v1.1.1'
 
 TIME_BETWEEN_TEXT = 0.3 # секунд
-TIME_TO_LAST_STAGE = 0.5 # секунд
+TIME_TO_LAST_TEXT_STAGE = 0.5 # секунд
 
 SOUND_VOLUME = 0.1
+
+TIME_TO_FIRST_DRON = 5
 TIME_BETWEEN_DRONS = 2
+
 NEW_DRON_SPEED_0 = 400
 NEW_DRON_SPEED_MULT = 1.00004
+
 MAX_DRONS = 2
 MAX_ROCKETS = 2
-# Урон для каждого типа зданий
 
+# Урон для каждого типа зданий
 # НПЗ
 REFINERY_DRON_DAMAGE = 10
 REFINERY_OBLOMOK_DAMAGE = 5
