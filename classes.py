@@ -5,6 +5,7 @@ from constants import SOUND_VOLUME, REFINERY_DRON_DAMAGE, REFINERY_OBLOMOK_DAMAG
     TANK_DRON_DAMAGE, TANK_OBLOMOK_DAMAGE, PVO_DRON_DAMAGE, PVO_OBLOMOK_DAMAGE, PVO_ROCKET_DAMAGE
 
 print("Загрузка звуков.")
+bell_sound = arcade.load_sound('sounds/bell.ogg')
 launch_sound = arcade.load_sound('sounds/launch.mp3')
 bom_sound = arcade.load_sound('sounds/boom short.mp3')
 print("Готово.\n")
@@ -505,6 +506,7 @@ class Dron(Projectile):
         if not self.path_to_target:
             return
 
+        # Когда приблизились к точке на пути, то дрон начинает лететь к следующей
         if abs(self.center_x - self.path_to_target[min(self.cur_target, len(self.path_to_target) - 1)][0]) <= 30:
             self.cur_target += 1
             self.cur_target = min(self.cur_target, len(self.path_to_target) - 1)
@@ -516,7 +518,7 @@ class Dron(Projectile):
             rot = self.rotation - int(self.rotation > 180) * 360
             delta = (new_rot - rot + 180) % 360 - 180
             # turning_speed = (1 - (sin(radians(delta - 180) / 2)) ** 10) * 500
-            # rocket.turning_speed = turning_speed
+            # self.turning_speed = turning_speed
 
             if -3 <= delta <= 3:
                 self.turning_right = False

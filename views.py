@@ -1,21 +1,37 @@
 import arcade
-from arcade.gui import UIManager, UITextureButton, UIAnchorLayout, UITextureButtonStyle
+from arcade.gui import UIManager, UITextureButton, UIAnchorLayout, UITextureButtonStyle, UIDropdown, UIOnChangeEvent
+from arcade.gui.widgets.buttons import UIFlatButtonStyle
 from pyglet.graphics import Batch
 from classes import Pvo, PvoTower, PvoRocket, Dron, Refinery, Tank
 from math import degrees, atan2, sin, radians
-from random import randint, triangular, shuffle, uniform
+from random import randint, triangular, shuffle, uniform, choice
 from constants import (TIME_BETWEEN_DRONS, NEW_DRON_SPEED_MULT, MAX_DRONS, MAX_ROCKETS, NEW_DRON_SPEED_0, STRIKE_COEFF,
-                       LOST_ROCKETS_COEFF, MISSED_DRONS_COEFF, DAMAGE_COEFF, INDUSTRY_STRIKE_COEFF, VERSION, TIME_BETWEEN_TEXT,
-                       TIME_TO_LAST_TEXT_STAGE)
+                       LOST_ROCKETS_COEFF, MISSED_DRONS_COEFF, DAMAGE_COEFF, INDUSTRY_STRIKE_COEFF, VERSION,
+                       TIME_BETWEEN_TEXT,
+                       TIME_TO_LAST_TEXT_STAGE, TIME_TO_FIRST_DRON, FLASHING_IMAGE_TIME)
 import json
-from os.path import exists
+import os
+from language import game_controls_text, creator_text, note_text
+from classes import bell_sound
 
 style_regular_button: dict[str, UITextureButtonStyle] = {}
-style_keybind_button: dict[str, UITextureButtonStyle] = {}
+dropdown_style = {'normal': UIFlatButtonStyle(
+                 font_color=arcade.color.BLACK, bg=arcade.color.WHITE, border=(186, 191, 186, 255), border_width=5),
+                 'hover': UIFlatButtonStyle(
+                 font_color=arcade.color.BLACK, bg=(226, 226, 226, 255), border=(186, 191, 186, 255), border_width=5)}
+dropdown_style['press'] = dropdown_style['hover']
+
+dropdown_active_style = {
+    'normal': UIFlatButtonStyle(
+        font_color=arcade.color.BLACK, bg=arcade.color.WHITE, border=(186, 191, 186, 255), border_width=3),
+    'hover': UIFlatButtonStyle(
+        font_color=arcade.color.BLACK, bg=(226, 226, 226, 255), border=(186, 191, 186, 255), border_width=3)}
+dropdown_active_style['press'] = dropdown_active_style['hover']
 
 print("Загрузка текстур (2/2).")
 button_texture_regular = arcade.load_texture('textures/gui/button regular.png')
 button_texture_interact = arcade.load_texture('textures/gui/button interact.png')
+empty_texture = arcade.Texture.create_empty(name="empty", size=(1, 1))
 # button_texture_disabled = arcade.load_texture('textures/gui/button disabled.png')
 # checkbox_texture_on = arcade.load_texture('textures/gui/checkbox on.png')
 # checkbox_texture_off = arcade.load_texture('textures/gui/checkbox off.png')
@@ -38,6 +54,16 @@ messages = \
      # 'sobyanin 0':    (arcade.load_texture('textures/messages/sobyanin 0.jpg'), 0.96, 0.422),
      'sobyanin template': (arcade.load_texture('textures/messages/sobyanin template.jpg'), 0.96, 0.422)
      }
+Z_images = (
+    arcade.load_texture("Z/0.png"),
+    arcade.load_texture("Z/1.png"),
+    arcade.load_texture("Z/2.png"),
+    arcade.load_texture("Z/3.png"),
+    arcade.load_texture("Z/4.png"),
+    arcade.load_texture("Z/5.png"),
+)
+previous_image = -1
+
 health_texture = arcade.load_texture('textures/empty health.png')
 arcade.load_font('fonts/OpenSans-Regular.ttf')
 font_times_new_roman = ("Times New Roman", "Times", "Liberation Serif")
@@ -52,28 +78,40 @@ prices: dict[str, int] = {'pvo': 1_200_435_200, 'rocket': 9_514_610, 'dron': 18_
 НПЗ:          893.980.440.000 рублей
 """
 
+with open("settings.json", "r", encoding="utf-8") as settings_f:
+    settings = json.load(settings_f)
+
+def screenshot():
+    new_screenshot = arcade.get_image(components=3)
+    if "screenshots" not in os.listdir():
+        os.mkdir("screenshots")
+        new_screenshot_num = 0
+    else:
+        new_screenshot_num = 0
+        for old_screenshot in os.listdir("screenshots"):
+            if old_screenshot[:10:] == "screenshot" and old_screenshot[-4::] == ".png":
+                new_screenshot_num = max(new_screenshot_num, int(old_screenshot[10:-4:]))
+        new_screenshot_num += 1
+    new_screenshot.save(f'screenshots/screenshot{new_screenshot_num}.png')
+
 class Menu(arcade.View):
-    def __init__(self):
+    def __init__(self, show_flashing_image: bool = False):
         super().__init__()
         w = self.window.width
         h = self.window.height
 
-        # Сокращение от relative
+        self.time = 0
+
+        # r -- сокращение от relative
         self.r = w / 1536
         # 1536 пикселей -- это ширина окна, с которым я тестировал игру у себя
         # Возможно, это из-за fullscreen=True
         global style_regular_button
-        global style_keybind_button
         style_regular_button = {
             "normal": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15*self.r),
             "hover": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15*self.r),
             "press": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=15*self.r),
             "disabled": UITextureButtonStyle(font_color=arcade.color.TRANSPARENT_BLACK, font_size=15*self.r)}
-        style_keybind_button = {
-            "normal": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r),
-            "hover": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r),
-            "press": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r),
-            "disabled": UITextureButtonStyle(font_color=arcade.color.BLACK, font_size=10*self.r)}
 
         self.keybind_button: None | UITextureButton = None
 
@@ -85,28 +123,16 @@ class Menu(arcade.View):
                                         align='center', anchor_x='center', anchor_y='center', batch=self.batch)
         self.game_controls_text = arcade.Text('', w * 0.02, h * 0.7, color=arcade.color.BLACK, font_size=15*self.r,
                                               multiline=True, width=w * 0.28, batch=self.batch)
-        self.game_controls_text.text = """
-        В этой увлекательной* игре вы сможете попробовать себя в роли российского военного и \
-̶п̶р̶е̶д̶с̶т̶а̶н̶е̶т̶е̶ ̶п̶е̶р̶е̶д̶ ̶с̶у̶д̶о̶м̶   сможете управлять установкой ПВО. Вам нужно будет как можно дольше защищать НПЗ от \
-украинских беспилотников. А если вы не справитесь...
-
-        Чтобы запустить ракету, нажмите <ЛКМ>, и ракета полетит в сторону курсора.
-        Чтобы управлять ракетой, водите курсором по экрану, ракета начнёт поворачивать в его сторону. \
-(Держите курсор подальше от ракеты, иначе она может начать петлять).
-        Вы можете поставить игру на паузу на <Пробел>.
-        
-        В каждый момент времени на поле может быть не более 2 ракет.
-        """
-        self.note_text = arcade.Text('*при очень растяжимом понятии "увлекательный"', w * 0.005, h * 0.04,
+        self.game_controls_text.text = game_controls_text[settings["language"]]
+        self.note_text = arcade.Text(note_text[settings["language"]], w * 0.005, h * 0.04,
                                         color=arcade.color.BLACK, anchor_y='bottom', font_size=12*self.r,
                                         batch=self.batch)
-        self.hint_text = arcade.Text("ESC — выход", self.window.width / 2,
-                                     self.window.height * 0.035 / 2,
+        self.hint_text = arcade.Text("ESC — выход", w / 2, h * 0.035 / 2,
                                      color=arcade.color.BLACK, font_size=12*self.r,
                                      anchor_x="center", anchor_y="center", align="center", batch=self.batch)
         self.future_text = arcade.Text("Скоро здесь что-то будет", w * 0.75, h * 0.7, rotation=60, font_size=30*self.r,
                                        color=arcade.color.DARK_GRAY, batch=self.batch)
-        self.creator_text = arcade.Text("от рандомного (недо)оппозиционера", w * 0.995, h * 0.04,
+        self.creator_text = arcade.Text(creator_text[settings["language"]], w * 0.995, h * 0.04,
                                         color=arcade.color.BLACK, font_size=12*self.r,
                                         anchor_x='right', anchor_y='bottom', batch=self.batch)
         # Кнопка
@@ -123,7 +149,41 @@ class Menu(arcade.View):
             game_view.setup()
             self.window.show_view(game_view)
 
+        language_dropdown = self.ui_manager.add(UIDropdown(
+            x=w * 0.02, y=h * 0.9, width=w * 0.12, height=w * 0.02,
+            default=settings["language"], options=["русский", "русский (Россия)"],
+            primary_style=dropdown_style, dropdown_style=dropdown_style, active_style=dropdown_active_style)
+        )
+        @language_dropdown.event()
+        def on_change(event: UIOnChangeEvent):
+            if event.old_value == event.new_value:
+                return
+            settings["language"] = event.new_value
+            with open("settings.json", "w+", encoding="utf-8") as settings_f:
+                json.dump(settings, settings_f, indent=4, ensure_ascii=False)
+            if event.new_value == "русский (Россия)":
+                self.window.show_view(Menu(True))
+            else:
+                self.window.show_view(Menu())
+
         self.ui_manager.enable()
+
+        self.language_text = arcade.Text("Язык:", language_dropdown.left, language_dropdown.top + h * 0.01,
+                                         color=arcade.color.BLACK, font_size=20 * self.r,
+                                         anchor_y='bottom', batch=self.batch)
+
+        self.flashing_image = None
+        if show_flashing_image:
+            global previous_image
+            # Это чтобы картинка не повторялась два раза подряд
+            image = randint(0, len(Z_images) - 1)
+            while image == previous_image:
+                image = randint(0, len(Z_images) - 1)
+
+            self.flashing_image = Z_images[image]
+            previous_image = image
+
+            arcade.play_sound(bell_sound)
 
         self.background_color = (232, 232, 232)
 
@@ -132,10 +192,19 @@ class Menu(arcade.View):
         arcade.draw_rect_filled(arcade.LRBT(0, self.window.width, 0, self.window.height * 0.035), arcade.color.WHITE)
         self.batch.draw()
         self.ui_manager.draw()
+        if self.flashing_image and self.time <= FLASHING_IMAGE_TIME:
+            arcade.draw_texture_rect(self.flashing_image, arcade.LRBT(0, self.window.width, 0, self.window.height),
+                                     alpha=int(255 - 255 * self.time / FLASHING_IMAGE_TIME))
 
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         if symbol == arcade.key.ESCAPE:
             self.window.close()
+
+        elif symbol == arcade.key.S:
+            screenshot()
+
+    def on_update(self, delta_time: float):
+        self.time += delta_time
 
 class Game(arcade.View):
     num_rockets = 0
@@ -332,7 +401,6 @@ class Game(arcade.View):
         self.time += delta_time
 
         self.time_since_last_dron += delta_time
-        self.new_drone_speed *= NEW_DRON_SPEED_MULT
 
         self.rocket_list.update(delta_time)
         self.dron_list.update(delta_time)
@@ -352,12 +420,14 @@ class Game(arcade.View):
         for dron in self.dron_list:
             if not dron.exploding:
                 self.num_drons += 1
-        if self.time_since_last_dron >= TIME_BETWEEN_DRONS and self.num_drons <= MAX_DRONS - 1 and not self.end:
+        if (self.time >= TIME_TO_FIRST_DRON and self.time_since_last_dron >= TIME_BETWEEN_DRONS
+                and self.num_drons <= MAX_DRONS - 1 and not self.end):
             new_dron = Dron(self, self.window.width + 100,
                             randint(int(self.window.height * 0.4), int(self.window.height * 0.9)), self.new_drone_speed)
             new_dron.set_target(self.industry_list[int(round(triangular(0, len(self.industry_list) - 1, -0.6)))])
             self.dron_list.append(new_dron)
             self.time_since_last_dron = 0
+            self.new_drone_speed *= NEW_DRON_SPEED_MULT
 
         if not self.end:
             self.score = int(self.num_strikes * STRIKE_COEFF - self.num_lost_rockets * LOST_ROCKETS_COEFF
@@ -388,6 +458,9 @@ class Game(arcade.View):
         elif symbol == arcade.key.SPACE and not self.end:
             self.pause = not self.pause
             self.pause_text.visible = self.pause
+
+        elif symbol == arcade.key.S:
+            screenshot()
 
     def on_mouse_motion(self, x: int, y: int, dx: int, dy: int) -> bool | None:
         if self.num_rockets != 0 and not self.end:
@@ -455,7 +528,7 @@ class End(arcade.View):
         self.stage = 0
 
         player_stats: dict[str, int | str]
-        if exists("player stats.json"):
+        if os.path.exists("player stats.json"):
             with open('player stats.json') as player_stats_file:
                 player_stats = json.load(player_stats_file)
 
@@ -687,25 +760,33 @@ class End(arcade.View):
 
         self.rates_batch = Batch()
         self.rates_visible = False
-        self.rating_text = arcade.Text('Рейтинг «единой россии»:                   за эту неделю',
+        self.rating_text = arcade.Text('Рейтинг «единой россии»:',
                                        w * 0.55, h * 0.3,
                                        color=arcade.color.BLACK, font_size=20*self.r,
                                        anchor_y='center', anchor_x='left', batch=self.rates_batch)
-        self.rating_rate_text = arcade.Text(f'{rating_rate: 0.2f}%', w * 0.807, h * 0.3,
+        self.this_week_text0 = arcade.Text('за эту неделю', self.rating_text.right + w * 0.085, self.rating_text.y,
+                                           color=arcade.color.BLACK, font_size=20*self.r,
+                                           anchor_y='center', batch=self.rates_batch)
+        self.rating_rate_text = arcade.Text(f'{"-" if settings["language"] == "русский" else "+"}{abs(rating_rate): 0.2f}%',
+                                            self.this_week_text0.left - w * 0.005, self.this_week_text0.y,
                                             color=(127, 0, 0), font_size=20*self.r,
                                             anchor_y='center', anchor_x='right', batch=self.rates_batch)
-        self.fuel_text = arcade.Text('Цены на бензин:                      за эту неделю',
+
+        self.fuel_text = arcade.Text('Цены на бензин:',
                                      w * 0.55, h * 0.26,
                                      color=arcade.color.BLACK, font_size=20*self.r,
                                      anchor_y='center', anchor_x='left', batch=self.rates_batch)
-        self.fuel_rate_text = arcade.Text(f'+{fuel_rate: 0.2f}%', w * 0.747, h * 0.26,
+        self.this_week_text1 = arcade.Text('за эту неделю', self.fuel_text.right + w * 0.085, self.fuel_text.y,
+                                           color=arcade.color.BLACK, font_size=20 * self.r,
+                                           anchor_y='center', batch=self.rates_batch)
+        self.fuel_rate_text = arcade.Text(f'{"+" if settings["language"] == "русский" else "-"}{fuel_rate: 0.2f}%',
+                                          self.this_week_text1.left - w * 0.005, self.this_week_text1.y,
                                           color=(127, 0, 0), font_size=20*self.r,
                                           anchor_y='center', anchor_x='right', batch=self.rates_batch)
 
         # Кнопки
         self.ui_manager = UIManager()
         anchor = self.ui_manager.add(UIAnchorLayout())
-        empty_texture = arcade.Texture.create_empty(name="empty", size=(1, 1))
         button_play = anchor.add(
             UITextureButton(text="Заново", width=w * 0.12 , height=w * 0.04,
                             texture=button_texture_regular, texture_hovered=button_texture_interact,
@@ -828,17 +909,19 @@ class End(arcade.View):
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         if symbol == arcade.key.ESCAPE:
             self.window.close()
+
         # Для дебага
         # elif symbol == arcade.key.R:
         #     self.window.show_view(End(0, 0, 0, 0, 0, "00:00", 0, 0, 0, 0))
+
         elif symbol == arcade.key.SPACE:
             for i in range(4):
                 self.table_drons_contents[i * 2].visible = True
                 self.table_drons_contents[i * 2 + 1].visible = True
             for i in range(len(self.table_destruction_contents) - 1):
-                self.table_destruction_contents[i - 4][0].visible = True
-                self.table_destruction_contents[i - 4][1].visible = True
-                self.table_destruction_contents[i - 4][2].visible = True
+                self.table_destruction_contents[i][0].visible = True
+                self.table_destruction_contents[i][1].visible = True
+                self.table_destruction_contents[i][2].visible = True
             self.total_price = self.price_rockets + self.price_pvo + self.price_refinery + self.price_tanks
             self.table_destruction_contents[-1][1].text = f'{self.total_price:_}'.replace('_', ' ')
             self.score_text.visible = True
@@ -851,7 +934,10 @@ class End(arcade.View):
             self.ui_manager.children[0][0].children[1].disabled = False
             self.ui_manager.children[0][0].children[2].disabled = False
             self.hint_text.text = "ESC — выйти"
-            self.stage = 15
+            self.stage = 100
+
+        elif symbol == arcade.key.S:
+            screenshot()
 
     def append_messages_list(self, num_strikes: int, num_missed_drons: int) -> None:
         w = self.window.width
