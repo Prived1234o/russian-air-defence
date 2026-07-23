@@ -63,7 +63,7 @@ Z_images = (
     arcade.load_texture("Z/5.png"),
     arcade.load_texture("Z/6.png")
 )
-previous_image = -1
+previous_images = [-1, -1, -1]
 
 health_texture = arcade.load_texture('textures/empty health.png')
 arcade.load_font('fonts/OpenSans-Regular.ttf')
@@ -175,14 +175,18 @@ class Menu(arcade.View):
 
         self.flashing_image = None
         if show_flashing_image:
-            global previous_image
-            # Это чтобы картинка не повторялась два раза подряд
+            global previous_images
+
+            # Это чтобы картинки не повторялись раза подряд
+            # Одна и та же картинка может попасться раз в 4 картинки или реже
             image = randint(0, len(Z_images) - 1)
-            while image == previous_image:
+            while image in previous_images:
                 image = randint(0, len(Z_images) - 1)
 
+            previous_images.pop(0)
+            previous_images.append(image)
+
             self.flashing_image = Z_images[image]
-            previous_image = image
 
             arcade.play_sound(bell_sound)
 
