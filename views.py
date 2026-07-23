@@ -61,6 +61,7 @@ Z_images = (
     arcade.load_texture("Z/3.png"),
     arcade.load_texture("Z/4.png"),
     arcade.load_texture("Z/5.png"),
+    arcade.load_texture("Z/6.png")
 )
 previous_image = -1
 
